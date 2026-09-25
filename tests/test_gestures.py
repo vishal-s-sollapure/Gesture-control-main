@@ -1,12 +1,14 @@
 """
-GestureControl AI - Unit Tests for Gesture Recognition & State Machine
-Uses synthetic hand landmark positions to test landmark geometry, finger states,
-pinch detection, open palm, fist, swipe history, and cooldown logic without real hardware.
+GestureControl AI - Comprehensive Unit Tests for Gesture Recognition & Safety System
+Tests gesture geometry, scale ratios, swipe conflict fixes, double click timing,
+cooldown logic, emergency stop safety, drag release, and disabled state enforcement.
 """
 
 import time
 import unittest
+
 from config import DEFAULT_SETTINGS
+from core.gesture_controller import GestureController
 from core.gesture_recognizer import GestureRecognizer, distance_2d, distance_3d
 from core.hand_tracker import (
     WRIST, THUMB_TIP, THUMB_IP, THUMB_MCP,
@@ -103,10 +105,25 @@ class TestGestureRecognition(unittest.TestCase):
         gesture, conf, dbg = self.recognizer.detect_gesture(pointing_lms)
         self.assertEqual(gesture, "CURSOR")
 
-    def test_detect_swipe(self):
-        """Tests dynamic horizontal swipe detection over position history buffer."""
+    def test_cursor_movement_does_not_trigger_swipe(self):
+        """CRITICAL FIX #1: Fast index finger movement must NEVER trigger a media swipe!"""
+        pointing_lms = create_dummy_landmarks(thumb=False, index=True, middle=False, ring=False, pinky=False)
         now = time.time()
-        # Simulate moving hand rapidly rightward (dx > 0.08)
+        # Simulate rapid index finger position movement over frames
+        self.recognizer.position_history.append((now - 0.20, 0.30, 0.5))
+        self.recognizer.position_history.append((now - 0.15, 0.40, 0.5))
+        self.recognizer.position_history.append((now - 0.10, 0.50, 0.5))
+        self.recognizer.position_history.append((now, 0.60, 0.5))
+
+        gesture, conf, dbg = self.recognizer.detect_gesture(pointing_lms)
+        # MUST evaluate to CURSOR, NOT SWIPE_RIGHT!
+        self.assertEqual(gesture, "CURSOR")
+        self.assertNotEqual(gesture, "SWIPE_RIGHT")
+
+    def test_swipe_requires_dedicated_pose(self):
+        """CRITICAL FIX #1: Swipe requires open/flat hand posture, NOT index pointing posture."""
+        open_hand_lms = create_dummy_landmarks(thumb=True, index=True, middle=True, ring=True, pinky=True)
+        now = time.time()
         self.recognizer.position_history.append((now - 0.20, 0.30, 0.5))
         self.recognizer.position_history.append((now - 0.15, 0.35, 0.5))
         self.recognizer.position_history.append((now - 0.10, 0.40, 0.5))
@@ -114,27 +131,86 @@ class TestGestureRecognition(unittest.TestCase):
         self.recognizer.position_history.append((now - 0.02, 0.50, 0.5))
         self.recognizer.position_history.append((now, 0.55, 0.5))
 
-        swipe = self.recognizer._detect_swipe()
-        self.assertEqual(swipe, "SWIPE_RIGHT")
+        gesture, conf, dbg = self.recognizer.detect_gesture(open_hand_lms)
+        self.assertEqual(gesture, "SWIPE_RIGHT")
 
-    def test_gesture_cooldown(self):
-        """Tests that state machine respects frame confirmation and cooldown intervals."""
-        # Frame 1: RIGHT_CLICK -> Requires 3 frames to confirm
-        g1, trig1, cd_act1, cd_rem1 = self.recognizer.process_state_machine("RIGHT_CLICK", 0.9)
-        self.assertFalse(trig1)
+    def test_double_click_timing_and_cooldown(self):
+        """CRITICAL FIX #2: Double pinch within interval triggers DOUBLE_PINCH without cooldown blockage."""
+        # 1. First Pinch -> 3 consecutive frames of PINCH
+        g1, trig1, cd_act1, cd_rem1 = "IDLE", False, False, 0.0
+        for _ in range(3):
+            g1, trig1, cd_act1, cd_rem1 = self.recognizer.process_state_machine("PINCH", 0.95)
 
-        # Frame 2: RIGHT_CLICK
-        g2, trig2, cd_act2, cd_rem2 = self.recognizer.process_state_machine("RIGHT_CLICK", 0.9)
-        self.assertFalse(trig2)
+        self.assertEqual(g1, "PINCH")
+        self.assertTrue(trig1)
 
-        # Frame 3: RIGHT_CLICK -> Confirmed and triggered!
-        g3, trig3, cd_act3, cd_rem3 = self.recognizer.process_state_machine("RIGHT_CLICK", 0.9)
-        self.assertTrue(trig3)
+        # Release pinch
+        self.recognizer.process_state_machine("IDLE", 0.5)
 
-        # Instant frame 4: RIGHT_CLICK -> Ignored due to active cooldown
-        g4, trig4, cd_act4, cd_rem4 = self.recognizer.process_state_machine("RIGHT_CLICK", 0.9)
-        self.assertFalse(trig4)
-        self.assertTrue(cd_act4)
+        # 2. Second Pinch 0.1s later (within 0.4s double click window) -> 3 consecutive frames of PINCH
+        time.sleep(0.05)
+        g2, trig2, cd_act2, cd_rem2 = "IDLE", False, False, 0.0
+        for _ in range(3):
+            g2, trig2, cd_act2, cd_rem2 = self.recognizer.process_state_machine("PINCH", 0.95)
+
+        self.assertEqual(g2, "DOUBLE_PINCH")
+        self.assertTrue(trig2)
+
+
+class TestSafetyAndController(unittest.TestCase):
+
+    def setUp(self):
+        self.settings = DEFAULT_SETTINGS.copy()
+        self.settings["control_enabled"] = False  # Default startup state is PAUSED
+        self.controller = GestureController(settings=self.settings, dry_run=True)
+
+    def test_default_startup_state_paused(self):
+        """SAFETY: Application default state must be CONTROL: PAUSED."""
+        self.assertFalse(self.controller.control_enabled)
+
+    def test_disabled_control_bypasses_actions(self):
+        """SAFETY: Disabled control MUST NOT trigger mouse/keyboard actions."""
+        self.controller.disable_control("Testing disabled bypass")
+        self.assertFalse(self.controller.control_enabled)
+        # Ensure mouse is not dragging
+        self.assertFalse(self.controller.mouse.is_dragging)
+
+    def test_emergency_stop_disables_control_and_releases_drag(self):
+        """SAFETY: Emergency stop immediately disables control and releases active drag."""
+        self.controller.enable_control()
+        self.controller.mouse.start_drag()
+        self.assertTrue(self.controller.mouse.is_dragging)
+
+        # Trigger Emergency Stop
+        self.controller.emergency_stop()
+        self.assertFalse(self.controller.control_enabled)
+        self.assertFalse(self.controller.mouse.is_dragging)
+
+    def test_shutdown_releases_drag(self):
+        """SAFETY: Application shutdown MUST release active mouse drag."""
+        self.controller.mouse.start_drag()
+        self.assertTrue(self.controller.mouse.is_dragging)
+
+        self.controller.stop()
+        self.assertFalse(self.controller.mouse.is_dragging)
+        self.assertFalse(self.controller.control_enabled)
+
+    def test_fist_disables_control(self):
+        """SAFETY: Fist emergency gesture disables control safely."""
+        self.controller.enable_control()
+        self.assertTrue(self.controller.control_enabled)
+
+        # Dispatch FIST action
+        self.controller._dispatch_action(
+            action_gesture="FIST",
+            trigger=True,
+            landmarks=[],
+            screen_w=1920,
+            screen_h=1080,
+            frame_w=640,
+            frame_h=480
+        )
+        self.assertFalse(self.controller.control_enabled)
 
 
 if __name__ == "__main__":

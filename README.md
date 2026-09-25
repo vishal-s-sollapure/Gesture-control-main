@@ -13,19 +13,22 @@ Designed for accessibility, hygiene, presentations, and modern human-computer in
 
 ---
 
-## ✨ Features
+## ✨ Key Features & Architectural Improvements
 
 - **10 Core Hand Gestures**: Fully mapped mouse, scroll, media, and system control actions.
-- **Real-Time 3D Hand Tracking**: Uses MediaPipe 21-landmark tracking with high precision.
+- **Strict Gesture Priority Chain**: Eliminates gesture conflicts (e.g. index cursor movement never accidentally triggers a media track swipe).
+- **Scale-Invariant Hand Geometry**: Uses hand-scale ratios (`distance / hand_scale`) to ensure accurate gesture recognition at any distance from the camera.
+- **Decoupled Double Click Timing**: Reliable double pinch detection without conflict with general action cooldown.
 - **Exponential Motion Smoothing (EMA)**: Eliminates hand jitter and cursor shake for fluid mouse control.
-- **Gesture State Machine & Cooldowns**: Prevents accidental actions and multi-click spam.
+- **Temporal State Machine & Cooldown**: Requires 3 consecutive frames before confirming discrete actions to prevent noisy accidental clicks.
 - **Safety First Architecture**:
-  - **Master Enable/Disable Control Switch**.
-  - **Emergency Keyboard Stop (`ESC` key)**.
-  - **Closed Fist Emergency Pause Gesture (`✊`)**.
-  - **Screen Boundary Clamping**.
-- **Modern Desktop Dashboard UI**: Real-time webcam overlay, status cards, gesture reference guide, live activity log feed, and interactive settings tuning window.
-- **Local Settings Persistence**: Customize sensitivity, smoothing, pinch thresholds, and individual gesture toggles saved to `settings.json`.
+  - **Default Launch State**: `CONTROL: PAUSED` (user must explicitly enable control).
+  - **Emergency Keyboard Stop**: `ESC` key in Dashboard UI.
+  - **Closed Fist Emergency Pause Gesture**: (`✊`).
+  - **Automatic Drag Release**: Mouse drag state is automatically released on emergency stop, camera failure, or application shutdown.
+  - **Screen Boundary Guard**: Cursor clamped strictly to display dimensions `[0, W-1] x [0, H-1]`.
+- **Modern Desktop Dashboard UI**: Real-time webcam overlay, visual status cards, gesture reference guide, live activity log feed, and interactive settings tuning window.
+- **Developer Debug Mode**: On-screen overlay showing landmarks, finger extension states, scale ratios, raw/confirmed gestures, and cooldown timers.
 
 ---
 
@@ -59,68 +62,26 @@ Designed for accessibility, hygiene, presentations, and modern human-computer in
                    │ Landmark Coordinates
                    ▼
        ┌────────────────────────┐
-       │   Gesture Recognizer   │ ──► Geometry & Vector Distances
+       │   Gesture Recognizer   │ ──► Scale-Invariant Geometry & Vector Ratios
        └───────────┬────────────┘
-                   │ Raw Gesture & Confidence
+                   │ Priority-Filtered Gesture & Genuine Confidence
                    ▼
        ┌────────────────────────┐
-       │ Gesture State Machine  │ ──► Frame Filtering & Cooldown
+       │ Gesture State Machine  │ ──► Consecutive Frame Filtering & Cooldown
        └───────────┬────────────┘
                    │ Confirmed Gesture Action
                    ▼
        ┌────────────────────────┐
-       │  Gesture Controller    │ ──► Check Master Enable / Safety
+       │  Gesture Controller    │ ──► Safety Checks & Drag Guard
        └───────────┬────────────┘
                    │ Screen Mapping & EMA Smoothing
                    ▼
        ┌────────────────────────────────────────────────────────┐
        │  System Action Dispatchers                             │
        │  ├── Mouse Controller (Move, Click, Drag, Scroll)      │
-       │  ├── Keyboard Controller (Hotkeys, ESC Listener)       │
+       │  ├── Keyboard Controller (Virtual Keypresses)          │
        │  └── Media Controller (Play/Pause, Next/Prev Track)    │
        └────────────────────────────────────────────────────────┘
-```
-
----
-
-## 📂 Project Structure
-
-```text
-GestureControlAI/
-│
-├── main.py                    # Application Entry Point
-├── config.py                  # Settings defaults & local JSON storage
-├── settings.json              # Saved user configuration parameters
-├── requirements.txt           # Project dependencies
-├── README.md                  # System documentation
-│
-├── core/
-│   ├── __init__.py
-│   ├── camera.py              # Threaded OpenCV video capture manager
-│   ├── hand_tracker.py        # MediaPipe 3D landmark extraction & drawing
-│   ├── gesture_recognizer.py  # Geometry, finger state & swipe detector
-│   └── gesture_controller.py  # Central pipeline orchestrator & safety HUD
-│
-├── controls/
-│   ├── __init__.py
-│   ├── mouse_controller.py    # PyAutoGUI mouse actions & screen bounds
-│   ├── keyboard_controller.py # Virtual keypresses & hotkey execution
-│   └── media_controller.py    # OS media playback triggers
-│
-├── ui/
-│   ├── __init__.py
-│   ├── dashboard.py           # Tkinter desktop GUI dashboard
-│   └── settings.py            # Settings configuration window
-│
-├── utils/
-│   ├── __init__.py
-│   ├── smoothing.py           # EMA smoother, ROI coordinate mapper & deadzone
-│   └── logger.py              # Thread-safe logging & UI event queue
-│
-└── tests/
-    ├── __init__.py
-    ├── test_gestures.py       # Unit tests for gestures & state machine
-    └── test_coordinates.py    # Unit tests for coordinate math & smoothing
 ```
 
 ---
@@ -133,41 +94,39 @@ GestureControlAI/
 | 🤏 | **Left Click** | Thumb tip & Index tip pinch together | Single left mouse click |
 | ✌️ | **Right Click** | Index & Middle fingers extended (V sign) | Single right mouse click |
 | ✋ | **Scroll** | Open palm moved vertically up/down | Scrolls page up / down |
-| ✊🤏 | **Drag & Drop** | Thumb & Index pinch and hold | Mouse down (hold), release to drop |
+| ✊🤏 | **Drag & Drop** | Sustained Thumb & Index pinch | Mouse down (hold), release to drop |
 | 🤏🤏 | **Double Click** | Two quick pinch gestures within 0.4s | Double left mouse click |
 | 👍 | **Media Play/Pause** | Thumbs up (Thumb up, other fingers folded) | Play / Pause media playback |
-| 👉 | **Next Track** | Horizontal swipe hand to the right | Skip to next media track |
-| 👈 | **Previous Track** | Horizontal swipe hand to the left | Skip to previous media track |
+| 👉 | **Next Track** | Rapid horizontal open-palm swipe to right | Skip to next media track |
+| 👈 | **Previous Track** | Rapid horizontal open-palm swipe to left | Skip to previous media track |
 | ✊ | **Emergency Pause** | Closed fist (all fingers folded) | Instantly pauses gesture control |
 
 ---
 
 ## 🚀 Installation & Quick Start
 
-### 1. Clone or Open Project Directory
+### 1. Open Project Directory
 
 ```bash
 cd GestureControlAI
 ```
 
-### 2. Create Virtual Environment
+### 2. Activate Virtual Environment
 
 **Windows:**
 ```bash
-python -m venv venv
 venv\Scripts\activate
 ```
 
 **macOS / Linux:**
 ```bash
-python3 -m venv venv
 source venv/bin/activate
 ```
 
 ### 3. Install Dependencies
 
 ```bash
-pip install -r requirements.txt
+pip install --no-build-isolation -r requirements.txt
 ```
 
 ### 4. Run Application
@@ -184,13 +143,13 @@ python main.py
 
 ## 🧪 Running Automated Unit Tests
 
-Automated tests do **NOT** move your physical mouse or trigger real keystrokes. They use synthetic hand landmarks and mocked controllers:
+Automated tests run with mocked/dry-run controllers and do **NOT** execute real system mouse movements:
 
 ```bash
 python -m unittest discover tests
 ```
 
-To run individual test files:
+To run individual test modules:
 ```bash
 python -m unittest tests/test_gestures.py
 python -m unittest tests/test_coordinates.py
@@ -200,10 +159,12 @@ python -m unittest tests/test_coordinates.py
 
 ## 🛡️ Safety & Master Controls
 
-1. **Master Control Switch**: Click `ENABLE CONTROL` on the dashboard to start computer actions. Click `DISABLE CONTROL` anytime to pause.
-2. **Emergency Keyboard Stop**: Pressing the `ESC` key at any point instantly revokes computer control.
-3. **Closed Fist Pause**: Form a closed fist (`✊`) towards the webcam to pause gesture control automatically.
-4. **Boundary Guard**: Mouse coordinates are clamped strictly within screen bounds to prevent off-screen cursor traps.
+1. **Default Startup State**: The application launches in **`CONTROL: PAUSED`** state. You must explicitly click `ENABLE GESTURE CONTROL` to begin computer interaction.
+2. **Emergency Keyboard Stop**: Pressing `ESC` while the Dashboard window is focused immediately pauses control.
+3. **Emergency GUI Button**: Clicking the red `🚨 EMERGENCY STOP (ESC)` button on the dashboard immediately halts actions.
+4. **Closed Fist Pause**: Form a closed fist (`✊`) towards the webcam to pause gesture control automatically.
+5. **Automatic Drag Cleanup**: Any active mouse drag is automatically released if control is paused, emergency stop is triggered, camera disconnects, or the application is closed.
+6. **Boundary Guard**: Mouse coordinates are clamped strictly within screen bounds `[0, Screen_Width-1] x [0, Screen_Height-1]`.
 
 ---
 
@@ -212,9 +173,11 @@ python -m unittest tests/test_coordinates.py
 Access settings via the **⚙ Settings** button on the dashboard:
 - **Cursor Sensitivity**: Adjust cursor reach speed across screen boundaries.
 - **Cursor Smoothing**: Change EMA smoothing factor (0.0 = raw, 0.95 = ultra-smooth).
-- **Pinch Threshold**: Calibrate distance threshold for click detection.
+- **Pinch Threshold Ratio**: Calibrate scale-relative distance threshold for click detection.
 - **Scroll Speed**: Tune vertical scroll sensitivity.
-- **Gesture Cooldown**: Set minimum delay between repeated discrete actions.
+- **Gesture Cooldown**: Set delay between repeated discrete actions (default 0.5s).
+- **Double Click Interval**: Set maximum time allowed between pinches for double click (default 0.4s).
+- **Developer Debug Mode**: Toggle on-screen landmark and state diagnostics overlay.
 - **Gesture Toggles**: Enable or disable specific gestures independently.
 
 ---
@@ -232,16 +195,6 @@ Access settings via the **⚙ Settings** button on the dashboard:
 
 ---
 
-## 🔮 Future Improvements
-
-- [ ] **Two-Hand Gestures**: Multi-hand gestures for zoom-in/out (pinch zoom) and window rotation.
-- [ ] **Custom Gesture Recorder**: Record custom user hand poses for customized hotkey shortcuts.
-- [ ] **Voice + Gesture Hybrid**: Combine voice commands ("click", "back") with hand pointing.
-- [ ] **Presentation Mode**: Dedicated slide presentation profile (next slide, laser pointer).
-- [ ] **App-Specific Profiles**: Custom gesture mappings per active application.
-
----
-
 ## 📄 License
 
-MIT License — Free for educational, research, and personal use.
+MIT License — Free for educational, research, hackathon, and personal use.

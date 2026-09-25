@@ -1,12 +1,14 @@
 """
 GestureControl AI - Keyboard Controller Module
-Handles keyboard shortcuts, hotkeys, and system key events.
+Handles virtual keypresses, hotkeys, and system keyboard event triggers.
+Includes optional platform-level hotkey listener capability.
 """
 
 from utils.logger import setup_logger, log_ui
 
 try:
     import pyautogui
+    pyautogui.PAUSE = 0.001
     HAS_PYAUTOGUI = True
 except ImportError:
     pyautogui = None
@@ -17,7 +19,7 @@ logger = setup_logger("KeyboardController")
 
 class KeyboardController:
     """
-    Handles virtual keyboard actions and shortcut invocations.
+    Handles virtual keyboard actions, shortcut invocations, and hotkey events.
     """
 
     def __init__(self, dry_run: bool = False):

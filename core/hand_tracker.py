@@ -14,14 +14,9 @@ MEDIAPIPE_IMPORT_ERROR = None
 
 try:
     import mediapipe as mp
-    try:
-        mp_hands = mp.solutions.hands
-        mp_drawing = mp.solutions.drawing_utils
-        mp_drawing_styles = mp.solutions.drawing_styles
-    except AttributeError:
-        from mediapipe.python.solutions import hands as mp_hands
-        from mediapipe.python.solutions import drawing_utils as mp_drawing
-        from mediapipe.python.solutions import drawing_styles as mp_drawing_styles
+    mp_hands = mp.solutions.hands
+    mp_drawing = mp.solutions.drawing_utils
+    mp_drawing_styles = mp.solutions.drawing_styles
     HAS_MEDIAPIPE = True
 except Exception as e:
     mp = None
@@ -79,12 +74,21 @@ class HandTracker:
                 self.hands_solution = mp_hands.Hands(
                     static_image_mode=False,
                     max_num_hands=self.max_num_hands,
+                    model_complexity=0,
                     min_detection_confidence=self.min_detection_confidence,
                     min_tracking_confidence=self.min_tracking_confidence
                 )
                 logger.info("MediaPipe Hands pipeline initialized successfully.")
             except Exception as e:
-                logger.error(f"Error initializing MediaPipe Hands: {e}")
+                try:
+                    self.hands_solution = mp_hands.Hands(
+                        static_image_mode=False,
+                        max_num_hands=self.max_num_hands,
+                        min_detection_confidence=self.min_detection_confidence,
+                        min_tracking_confidence=self.min_tracking_confidence
+                    )
+                except Exception as ex:
+                    logger.error(f"Error initializing MediaPipe Hands: {ex}")
         else:
             err_details = f" ({MEDIAPIPE_IMPORT_ERROR})" if MEDIAPIPE_IMPORT_ERROR else ""
             logger.warning(f"MediaPipe library unavailable{err_details}. Running in mock tracking mode.")

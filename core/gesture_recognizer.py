@@ -1,7 +1,8 @@
 """
 GestureControl AI - Gesture Recognizer Module
 Implements scale-invariant landmark geometry, finger state detection, priority-based
-conflict elimination, temporal stability filtering, genuine confidence scoring, and debug state data.
+conflict elimination, dedicated swipe posture checking, decoupled double-click timing,
+genuine confidence scoring, and debug state data.
 """
 
 from collections import deque
@@ -38,11 +39,13 @@ def distance_2d(p1: dict, p2: dict) -> float:
 class GestureRecognizer:
     """
     Analyzes 21 3D hand landmark coordinates to infer hand gestures, eliminate gesture conflicts,
-    compute genuine confidence scores, and enforce temporal stability.
+    compute scale-invariant metrics, genuine confidence scores, and enforce temporal stability.
     """
 
     def __init__(self, settings: dict):
         self.settings = settings
+
+        # Timing Memory
         self.last_action_time = 0.0
         self.last_pinch_time = 0.0
         self.is_pinching = False
@@ -65,7 +68,7 @@ class GestureRecognizer:
     def analyze_finger_states(self, landmarks: List[dict], hand_scale: float) -> Dict[str, bool]:
         """
         Determines extension state (True = Extended, False = Folded) for all 5 fingers
-        using scale-invariant joint distances and vector angles.
+        using scale-invariant joint distances and vector positions.
         """
         if not landmarks or len(landmarks) < 21:
             return {"thumb": False, "index": False, "middle": False, "ring": False, "pinky": False}
@@ -76,17 +79,12 @@ class GestureRecognizer:
         def is_finger_extended(tip_idx: int, pip_idx: int, mcp_idx: int) -> bool:
             dist_tip = distance_3d(landmarks[tip_idx], wrist)
             dist_pip = distance_3d(landmarks[pip_idx], wrist)
-            dist_mcp = distance_3d(landmarks[mcp_idx], wrist)
 
-            # Extended if tip is clearly further from wrist than PIP joint
             extended_dist = dist_tip > dist_pip * 1.12
-            # Also verify tip distance from MCP is greater than PIP from MCP
             extended_mcp = distance_3d(landmarks[tip_idx], landmarks[mcp_idx]) > distance_3d(landmarks[pip_idx], landmarks[mcp_idx]) * 1.15
             return extended_dist and extended_mcp
 
-        # Thumb extension rule: compare thumb tip distance from pinky MCP joint vs thumb MCP
         thumb_tip = landmarks[THUMB_TIP]
-        thumb_ip = landmarks[THUMB_IP]
         thumb_mcp = landmarks[THUMB_MCP]
         pinky_mcp = landmarks[PINKY_MCP]
 
@@ -130,14 +128,21 @@ class GestureRecognizer:
         raw_pinch_dist = distance_2d(landmarks[THUMB_TIP], landmarks[INDEX_FINGER_TIP])
         pinch_ratio = raw_pinch_dist / hand_scale
 
-        # Pinch ratio threshold (typically ~0.26 is a pinch, >0.40 is open)
+        # Scale-relative pinch ratio threshold (~0.25 is pinch, >0.40 is open)
         pinch_thresh_ratio = self.settings.get("pinch_threshold", 0.045) / 0.18
 
         thumb_tip = landmarks[THUMB_TIP]
         thumb_ip = landmarks[THUMB_IP]
-        thumb_mcp = landmarks[THUMB_MCP]
 
-        # Update position history deque for swipe velocity detection
+        # Index finger pointing posture evaluation
+        pointing_index = (
+            fingers["index"] and
+            not fingers["middle"] and
+            not fingers["ring"] and
+            not fingers["pinky"]
+        )
+
+        # Track wrist position over time for dynamic swipe detection
         now = time.time()
         self.position_history.append((now, wrist["x"], wrist["y"]))
 
@@ -147,33 +152,32 @@ class GestureRecognizer:
         # STRICT PRIORITY CHAIN TO PREVENT GESTURE CONFLICTS
         # -------------------------------------------------------------
 
-        # PRIORITY 1: CLOSED FIST (Pause Control)
-        # All 4 main fingers folded into palm
+        # PRIORITY 1: CLOSED FIST (Emergency Pause Control)
         folded_count = sum(1 for f in ["index", "middle", "ring", "pinky"] if not fingers[f])
         fist_tip_dist = sum(distance_2d(landmarks[tip], wrist) for tip in [INDEX_FINGER_TIP, MIDDLE_FINGER_TIP, RING_FINGER_TIP, PINKY_TIP]) / 4.0
         fist_ratio = fist_tip_dist / hand_scale
 
         is_fist = (folded_count == 4) and (fist_ratio < 1.35)
-        if is_fist:
-            if enabled.get("emergency_fist", True):
-                # Calculate genuine confidence from foldedness closeness
-                conf = max(0.70, min(0.99, 1.0 - (fist_ratio / 1.35) * 0.3))
-                debug_data = self._make_debug(landmarks, fingers, pinch_ratio, hand_scale, "FIST", conf)
-                return "FIST", round(conf, 2), debug_data
+        if is_fist and enabled.get("emergency_fist", True):
+            conf = max(0.70, min(0.99, 1.0 - (fist_ratio / 1.35) * 0.3))
+            debug_data = self._make_debug(landmarks, fingers, pinch_ratio, hand_scale, "FIST", conf)
+            return "FIST", round(conf, 2), debug_data
 
-        # PRIORITY 2: SWIPE DETECTION (Horizontal motion across time history)
-        swipe_detected = self._detect_swipe()
-        if swipe_detected == "SWIPE_LEFT" and enabled.get("prev_track", True):
-            debug_data = self._make_debug(landmarks, fingers, pinch_ratio, hand_scale, "SWIPE_LEFT", 0.92)
-            return "SWIPE_LEFT", 0.92, debug_data
-        elif swipe_detected == "SWIPE_RIGHT" and enabled.get("next_track", True):
-            debug_data = self._make_debug(landmarks, fingers, pinch_ratio, hand_scale, "SWIPE_RIGHT", 0.92)
-            return "SWIPE_RIGHT", 0.92, debug_data
+        # PRIORITY 2: DEDICATED SWIPE DETECTION (Critical Fix #1)
+        # CRITICAL SAFETY REQUIREMENT: Normal index-finger cursor movement MUST NEVER trigger swipe!
+        # Swipe is ONLY evaluated if pointing_index is False and hand is in an open/flat posture!
+        open_or_flat_posture = (fingers["index"] and fingers["middle"]) or (fingers["index"] and fingers["ring"])
+        if not pointing_index and open_or_flat_posture:
+            swipe_detected = self._detect_swipe()
+            if swipe_detected == "SWIPE_LEFT" and enabled.get("prev_track", True):
+                debug_data = self._make_debug(landmarks, fingers, pinch_ratio, hand_scale, "SWIPE_LEFT", 0.92)
+                return "SWIPE_LEFT", 0.92, debug_data
+            elif swipe_detected == "SWIPE_RIGHT" and enabled.get("next_track", True):
+                debug_data = self._make_debug(landmarks, fingers, pinch_ratio, hand_scale, "SWIPE_RIGHT", 0.92)
+                return "SWIPE_RIGHT", 0.92, debug_data
 
-        # PRIORITY 3: PINCH / DRAG / DOUBLE CLICK
-        # Scale-relative pinch ratio check
+        # PRIORITY 3: PINCH / DRAG / DOUBLE PINCH
         if pinch_ratio < pinch_thresh_ratio:
-            # Genuine confidence calculation based on pinch closeness
             conf = max(0.75, min(0.99, 1.0 - (pinch_ratio / pinch_thresh_ratio) * 0.4))
             if enabled.get("drag_and_drop", True) and self.is_pinching:
                 debug_data = self._make_debug(landmarks, fingers, pinch_ratio, hand_scale, "DRAG", conf)
@@ -183,7 +187,6 @@ class GestureRecognizer:
                 return "PINCH", round(conf, 2), debug_data
 
         # PRIORITY 4: THUMBS UP (Play/Pause Media)
-        # Thumb extended UPWARDS (tip higher than IP and MCP), all 4 fingers folded into fist
         thumbs_up_orientation = (thumb_tip["y"] < thumb_ip["y"] - 0.03) and (thumb_tip["y"] < wrist["y"] - 0.1)
         is_thumbs_up = (
             fingers["thumb"] and
@@ -199,7 +202,6 @@ class GestureRecognizer:
             return "THUMBS_UP", conf, debug_data
 
         # PRIORITY 5: OPEN PALM (Scroll Gesture)
-        # All 5 fingers extended, pinch ratio open
         all_extended = fingers["thumb"] and fingers["index"] and fingers["middle"] and fingers["ring"] and fingers["pinky"]
         if all_extended and pinch_ratio > pinch_thresh_ratio * 1.4 and enabled.get("scroll", True):
             conf = 0.91
@@ -207,7 +209,6 @@ class GestureRecognizer:
             return "OPEN_PALM", conf, debug_data
 
         # PRIORITY 6: TWO FINGERS (Right Click)
-        # Index & Middle extended, Ring & Pinky folded
         two_fingers = (
             fingers["index"] and
             fingers["middle"] and
@@ -221,15 +222,7 @@ class GestureRecognizer:
             return "RIGHT_CLICK", conf, debug_data
 
         # PRIORITY 7: INDEX POINTING (Cursor Movement)
-        # Index extended, Middle, Ring, Pinky folded
-        pointing_index = (
-            fingers["index"] and
-            not fingers["middle"] and
-            not fingers["ring"] and
-            not fingers["pinky"]
-        )
         if pointing_index and enabled.get("cursor_movement", True):
-            # Calculate genuine confidence based on index tip extension vs folded fingers
             index_dist = distance_3d(landmarks[INDEX_FINGER_TIP], wrist)
             middle_dist = distance_3d(landmarks[MIDDLE_FINGER_TIP], wrist)
             ratio = index_dist / (middle_dist + 1e-6)
@@ -253,13 +246,11 @@ class GestureRecognizer:
         dt = t_end - t_start
         dx = x_end - x_start
 
-        # Swipe must complete within 0.35s
         if dt > 0.35 or dt <= 0.0:
             return None
 
         swipe_thresh = self.settings.get("swipe_threshold", 0.08)
 
-        # Note: Camera frame is mirrored horizontally in mapping, so dx > thresh is Swipe Right in user perspective
         if dx > swipe_thresh:
             self.position_history.clear()
             return "SWIPE_RIGHT"
@@ -273,17 +264,22 @@ class GestureRecognizer:
         """
         Filters raw gestures through temporal state machine:
         - Consecutive frame consistency confirmation (3 frames required for discrete actions)
-        - Cooldown timer after actions (0.5s default)
-        - Double pinch timing
+        - Decoupled double-click timing (Critical Fix #2)
+        - Cooldown timer after actions
 
         :return: Tuple of (actionable_gesture: str, trigger_flag: bool, cooldown_active: bool, cooldown_remaining: float)
         """
         now = time.time()
         cooldown = self.settings.get("gesture_cooldown", 0.50)
+        double_click_interval = self.settings.get("double_click_interval", 0.40)
 
         time_since_last = now - self.last_action_time
         cooldown_active = time_since_last < cooldown
         cooldown_remaining = max(0.0, cooldown - time_since_last) if cooldown_active else 0.0
+
+        # Update pinch release memory IMMEDIATELY regardless of frame counter exit
+        if raw_gesture != "PINCH" and raw_gesture != "DRAG":
+            self.is_pinching = False
 
         # Frame consistency counter update
         if raw_gesture == self.prev_raw_gesture:
@@ -292,7 +288,6 @@ class GestureRecognizer:
             self.gesture_frame_count = 1
             self.prev_raw_gesture = raw_gesture
 
-        # Continuous movement gestures (CURSOR, DRAG, OPEN_PALM) don't require strict multi-frame delay once active
         is_continuous = raw_gesture in ["CURSOR", "DRAG", "OPEN_PALM"]
         required_frames = 1 if is_continuous else self.required_confirm_frames
 
@@ -301,35 +296,34 @@ class GestureRecognizer:
 
         confirmed_gesture = raw_gesture
 
-        # Pinch state memory update
-        if raw_gesture != "PINCH" and raw_gesture != "DRAG":
-            if self.is_pinching:
-                self.is_pinching = False
-
         # Continuous actions bypass discrete action cooldown
         if is_continuous:
             return confirmed_gesture, True, False, 0.0
 
-        # If cooldown is active, block repeat discrete triggers
-        if cooldown_active:
-            return confirmed_gesture, False, True, round(cooldown_remaining, 2)
-
-        # Handle Double Click vs Left Click for PINCH
+        # -------------------------------------------------------------
+        # CRITICAL FIX #2 — DECOUPLED DOUBLE CLICK vs COOLDOWN TIMING
+        # -------------------------------------------------------------
         if confirmed_gesture == "PINCH":
-            double_click_interval = self.settings.get("double_click_interval", 0.4)
             if not self.is_pinching:
                 self.is_pinching = True
-                if (now - self.last_pinch_time) < double_click_interval:
+                time_since_last_pinch = now - self.last_pinch_time
+
+                if time_since_last_pinch < double_click_interval and self.last_pinch_time > 0:
+                    # Second pinch within double-click window -> TRIGGER DOUBLE CLICK
                     self.last_action_time = now
                     self.last_pinch_time = 0.0
                     return "DOUBLE_PINCH", True, True, cooldown
                 else:
+                    # First pinch -> TRIGGER SINGLE LEFT CLICK
                     self.last_pinch_time = now
                     self.last_action_time = now
                     return "PINCH", True, True, cooldown
             return "PINCH", False, False, 0.0
 
         # Discrete actions (RIGHT_CLICK, THUMBS_UP, SWIPE_LEFT, SWIPE_RIGHT, FIST)
+        if cooldown_active:
+            return confirmed_gesture, False, True, round(cooldown_remaining, 2)
+
         if confirmed_gesture in ["RIGHT_CLICK", "THUMBS_UP", "SWIPE_LEFT", "SWIPE_RIGHT", "FIST"]:
             self.last_action_time = now
             return confirmed_gesture, True, True, cooldown
