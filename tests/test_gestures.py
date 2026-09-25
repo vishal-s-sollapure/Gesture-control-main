@@ -147,7 +147,7 @@ class TestGestureRecognition(unittest.TestCase):
         # Release pinch
         self.recognizer.process_state_machine("IDLE", 0.5)
 
-        # 2. Second Pinch 0.1s later (within 0.4s double click window) -> 3 consecutive frames of PINCH
+        # 2. Second Pinch 0.05s later (within 0.4s double click window) -> 3 consecutive frames of PINCH
         time.sleep(0.05)
         g2, trig2, cd_act2, cd_rem2 = "IDLE", False, False, 0.0
         for _ in range(3):
@@ -155,6 +155,34 @@ class TestGestureRecognition(unittest.TestCase):
 
         self.assertEqual(g2, "DOUBLE_PINCH")
         self.assertTrue(trig2)
+
+    def test_pinch_hold_is_not_double_click(self):
+        """Sustained pinch hold should NOT trigger double click."""
+        for _ in range(3):
+            g, trig, cd_act, cd_rem = self.recognizer.process_state_machine("PINCH", 0.95)
+        self.assertEqual(g, "PINCH")
+
+        # Continued frames of holding pinch without release
+        for _ in range(5):
+            g_hold, trig_hold, _, _ = self.recognizer.process_state_machine("PINCH", 0.95)
+            self.assertNotEqual(g_hold, "DOUBLE_PINCH")
+
+    def test_pinch_separated_by_interval_is_two_single_clicks(self):
+        """Pinch separated by more than double-click interval (0.4s) results in independent single clicks."""
+        for _ in range(3):
+            self.recognizer.process_state_machine("PINCH", 0.95)
+
+        self.recognizer.process_state_machine("IDLE", 0.5)
+
+        # Wait 0.5s (longer than 0.4s double_click_interval)
+        time.sleep(0.5)
+
+        g_second, trig_second, _, _ = "IDLE", False, False, 0.0
+        for _ in range(3):
+            g_second, trig_second, _, _ = self.recognizer.process_state_machine("PINCH", 0.95)
+
+        self.assertEqual(g_second, "PINCH")
+        self.assertNotEqual(g_second, "DOUBLE_PINCH")
 
 
 class TestSafetyAndController(unittest.TestCase):
@@ -172,7 +200,6 @@ class TestSafetyAndController(unittest.TestCase):
         """SAFETY: Disabled control MUST NOT trigger mouse/keyboard actions."""
         self.controller.disable_control("Testing disabled bypass")
         self.assertFalse(self.controller.control_enabled)
-        # Ensure mouse is not dragging
         self.assertFalse(self.controller.mouse.is_dragging)
 
     def test_emergency_stop_disables_control_and_releases_drag(self):
