@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GestureControl AI — Touchless Computer Control</title>
+  <meta name="description" content="Touchless Desktop Computer Control using Computer Vision & AI Hand Tracking. Control your computer with hand gestures captured through webcam.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-dark: #0F0F17;
+      --card-bg: #1A1A26;
+      --card-border: #2A2A3D;
+      --accent-teal: #00ADB5;
+      --accent-green: #00E676;
+      --accent-cyan: #00D26A;
+      --text-main: #FFFFFF;
+      --text-muted: #A0A0B8;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Outfit', sans-serif;
+      background-color: var(--bg-dark);
+      color: var(--text-main);
+      line-height: 1.6;
+      overflow-x: hidden;
+    }
+
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 1.5rem 8%;
+      background: rgba(26, 26, 38, 0.8);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--card-border);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+
+    .logo {
+      font-weight: 800;
+      font-size: 1.4rem;
+      letter-spacing: 1px;
+      color: var(--accent-teal);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .nav-links a {
+      color: var(--text-muted);
+      text-decoration: none;
+      margin-left: 2rem;
+      font-weight: 500;
+      transition: color 0.3s ease;
+    }
+
+    .nav-links a:hover {
+      color: var(--accent-teal);
+    }
+
+    .hero {
+      text-align: center;
+      padding: 5rem 10% 4rem;
+      position: relative;
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 6px 16px;
+      background: rgba(0, 173, 181, 0.15);
+      border: 1px solid var(--accent-teal);
+      color: var(--accent-teal);
+      border-radius: 50px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      margin-bottom: 1.5rem;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    h1 {
+      font-size: 3.5rem;
+      font-weight: 800;
+      line-height: 1.2;
+      margin-bottom: 1.5rem;
+      background: linear-gradient(135deg, #FFFFFF 0%, #00ADB5 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .hero p {
+      font-size: 1.25rem;
+      color: var(--text-muted);
+      max-width: 750px;
+      margin: 0 auto 2.5rem;
+    }
+
+    .btn-group {
+      display: flex;
+      justify-content: center;
+      gap: 1.2rem;
+      flex-wrap: wrap;
+    }
+
+    .btn {
+      padding: 14px 32px;
+      border-radius: 8px;
+      font-weight: 700;
+      text-decoration: none;
+      font-size: 1rem;
+      transition: all 0.3s ease;
+      cursor: pointer;
+    }
+
+    .btn-primary {
+      background: var(--accent-teal);
+      color: #000;
+      box-shadow: 0 4px 20px rgba(0, 173, 181, 0.4);
+    }
+
+    .btn-primary:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 25px rgba(0, 173, 181, 0.6);
+    }
+
+    .btn-secondary {
+      background: var(--card-bg);
+      color: var(--text-main);
+      border: 1px solid var(--card-border);
+    }
+
+    .btn-secondary:hover {
+      border-color: var(--accent-teal);
+      color: var(--accent-teal);
+    }
+
+    .features-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 2rem;
+      padding: 4rem 8%;
+    }
+
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 12px;
+      padding: 2rem;
+      transition: transform 0.3s ease, border-color 0.3s ease;
+    }
+
+    .card:hover {
+      transform: translateY(-5px);
+      border-color: var(--accent-teal);
+    }
+
+    .card-icon {
+      font-size: 2.5rem;
+      margin-bottom: 1rem;
+    }
+
+    .card h3 {
+      font-size: 1.3rem;
+      margin-bottom: 0.8rem;
+      color: var(--text-main);
+    }
+
+    .card p {
+      color: var(--text-muted);
+      font-size: 0.95rem;
+    }
+
+    .gestures-section {
+      padding: 4rem 8%;
+      background: #141420;
+    }
+
+    .section-title {
+      text-align: center;
+      font-size: 2.2rem;
+      font-weight: 700;
+      margin-bottom: 3rem;
+      color: var(--accent-teal);
+    }
+
+    .gesture-table {
+      width: 100%;
+      border-collapse: collapse;
+      background: var(--card-bg);
+      border-radius: 12px;
+      overflow: hidden;
+      border: 1px solid var(--card-border);
+    }
+
+    .gesture-table th, .gesture-table td {
+      padding: 1.2rem 1.5rem;
+      text-align: left;
+    }
+
+    .gesture-table th {
+      background: #222234;
+      color: var(--accent-teal);
+      font-weight: 700;
+      border-bottom: 1px solid var(--card-border);
+    }
+
+    .gesture-table tr:not(:last-child) td {
+      border-bottom: 1px solid var(--card-border);
+    }
+
+    .code-block {
+      background: #0B0B10;
+      border: 1px solid var(--card-border);
+      border-radius: 8px;
+      padding: 1.5rem;
+      font-family: 'JetBrains Mono', monospace;
+      color: var(--accent-green);
+      margin: 2rem auto;
+      max-width: 700px;
+      text-align: left;
+      font-size: 0.95rem;
+    }
+
+    footer {
+      text-align: center;
+      padding: 3rem 8%;
+      border-top: 1px solid var(--card-border);
+      color: var(--text-muted);
+      font-size: 0.9rem;
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="logo">🖐️ GestureControl AI</div>
+    <nav class="nav-links">
+      <a href="#features">Features</a>
+      <a href="#gestures">Supported Gestures</a>
+      <a href="#setup">Setup & Run</a>
+      <a href="https://github.com/vishal-s-sollapure/Gesture-control-main" target="_blank">GitHub</a>
+    </nav>
+  </header>
+
+  <section class="hero">
+    <div class="badge">100% Offline & Local Computer Vision</div>
+    <h1>Touchless Desktop Control using AI Hand Tracking</h1>
+    <p>Control your laptop or desktop computer seamlessly using real-time webcam hand gestures. Built with Python, OpenCV, MediaPipe, PyAutoGUI, and NumPy.</p>
+    <div class="btn-group">
+      <a href="https://github.com/vishal-s-sollapure/Gesture-control-main" target="_blank" class="btn btn-primary">View on GitHub 🚀</a>
+      <a href="#setup" class="btn btn-secondary">Local Installation Guide</a>
+    </div>
+  </section>
+
+  <section id="features" class="features-grid">
+    <div class="card">
+      <div class="card-icon">🎯</div>
+      <h3>Real-Time 3D Landmark Tracking</h3>
+      <p>Uses MediaPipe 21 3D hand landmarks with scale-invariant distance metrics for accurate gesture recognition at any distance.</p>
+    </div>
+
+    <div class="card">
+      <div class="card-icon">🌊</div>
+      <h3>Exponential Motion Smoothing</h3>
+      <p>Applies EMA smoothing and dead-zone filtering to eliminate cursor shaking and ensure fluid mouse positioning.</p>
+    </div>
+
+    <div class="card">
+      <div class="card-icon">🛡️</div>
+      <h3>Safety First Architecture</h3>
+      <p>Launches in PAUSED state by default. Includes ESC hotkey emergency stop, closed fist pause gesture, and automatic drag release.</p>
+    </div>
+
+    <div class="card">
+      <div class="card-icon">⏱️</div>
+      <h3>Decoupled Double Click Timing</h3>
+      <p>Reliable double-click detection without conflict with general action cooldowns or single click spam.</p>
+    </div>
+  </section>
+
+  <section id="gestures" class="gestures-section">
+    <h2 class="section-title">Mapped Hand Gestures</h2>
+    <table class="gesture-table">
+      <thead>
+        <tr>
+          <th>Gesture Icon</th>
+          <th>Gesture Name</th>
+          <th>Hand Pose Description</th>
+          <th>System Action</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>☝️</td>
+          <td>Cursor Movement</td>
+          <td>Index finger extended, other fingers folded</td>
+          <td>Moves mouse cursor smoothly</td>
+        </tr>
+        <tr>
+          <td>🤏</td>
+          <td>Left Click</td>
+          <td>Thumb tip & Index tip pinch together</td>
+          <td>Single left mouse click</td>
+        </tr>
+        <tr>
+          <td>✌️</td>
+          <td>Right Click</td>
+          <td>Index & Middle fingers extended (V sign)</td>
+          <td>Single right mouse click</td>
+        </tr>
+        <tr>
+          <td>✋</td>
+          <td>Scroll</td>
+          <td>Open palm moved vertically up/down</td>
+          <td>Scrolls page up / down</td>
+        </tr>
+        <tr>
+          <td>✊🤏</td>
+          <td>Drag & Drop</td>
+          <td>Sustained Thumb & Index pinch</td>
+          <td>Holds left click, releases on open pinch</td>
+        </tr>
+        <tr>
+          <td>🤏🤏</td>
+          <td>Double Click</td>
+          <td>Two quick pinches within 0.4 seconds</td>
+          <td>Double left mouse click</td>
+        </tr>
+        <tr>
+          <td>👍</td>
+          <td>Media Play/Pause</td>
+          <td>Thumbs Up (Thumb up, others folded)</td>
+          <td>Play / Pause media playback</td>
+        </tr>
+        <tr>
+          <td>👉</td>
+          <td>Next Track</td>
+          <td>Horizontal open-palm swipe to right</td>
+          <td>Skips to Next Track</td>
+        </tr>
+        <tr>
+          <td>👈</td>
+          <td>Previous Track</td>
+          <td>Horizontal open-palm swipe to left</td>
+          <td>Skips to Previous Track</td>
+        </tr>
+        <tr>
+          <td>✊</td>
+          <td>Emergency Pause</td>
+          <td>Closed fist (all fingers folded)</td>
+          <td>Instantly pauses gesture control</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section id="setup" style="padding: 4rem 8%; text-align: center;">
+    <h2 class="section-title">How to Run Locally</h2>
+    <p style="color: var(--text-muted);">Clone the repository and run locally on your laptop with webcam access:</p>
+
+    <div class="code-block">
+# 1. Clone repository<br>
+git clone https://github.com/vishal-s-sollapure/Gesture-control-main.git<br>
+cd Gesture-control-main<br><br>
+# 2. Setup virtual environment & dependencies<br>
+python -m venv venv<br>
+venv\Scripts\activate  # On Windows<br>
+pip install --no-build-isolation -r requirements.txt<br><br>
+# 3. Launch GestureControl AI<br>
+python main.py
+    </div>
+  </section>
+
+  <footer>
+    <p>GestureControl AI — Touchless Computer Control | Open Source College / Hackathon Prototype</p>
+  </footer>
+
+</body>
+</html>
