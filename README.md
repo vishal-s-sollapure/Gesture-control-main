@@ -202,5 +202,32 @@ The repository includes an `index.html` web presentation landing page hosted via
 
 ---
 
+## 🛠️ Tech Stack & Key Libraries
+
+* **Core Language**: Python 3.10+
+* **Computer Vision**: OpenCV (`opencv-python`), MediaPipe (`mediapipe`)
+* **Machine Learning**: `scikit-learn` (Random Forest Classifier, train/test split, metrics)
+* **System Automation**: PyAutoGUI (`pyautogui`)
+* **GUI Framework**: Tkinter / Pillow (`PIL`)
+* **CI/CD & Build Tools**: GitHub Actions, PyInstaller (`pyinstaller`)
+
+---
+
+## ⚠️ Limitations & Technical Scope
+
+* **Lighting Sensitivity**: Extremely low-light environments may reduce MediaPipe landmark confidence scores below the default `0.70` threshold.
+* **Single Hand Tracking**: Optimized for single primary hand interaction to avoid ambiguous cursor positioning.
+* **OS Accessibility Permissions**: Windows/macOS require permission for PyAutoGUI system mouse synthesization.
+
+---
+
+## 🚀 Future Improvements
+
+* **Custom ML Model Upload**: GUI interface to collect custom gesture training samples and fine-tune user-specific Random Forest models dynamically.
+* **Multi-Hand Support**: Dual hand support (left hand for modifier keys/mode toggles, right hand for cursor navigation).
+* **Cross-Platform Installer**: Packaging for macOS (`.app`) and Linux AppImage.
+
+---
+
 ## 📄 License
 This project is licensed under the [MIT License](LICENSE).
