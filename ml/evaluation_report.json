@@ -1,0 +1,104 @@
+{
+    "dataset_total_samples": 800,
+    "train_samples": 640,
+    "test_samples": 160,
+    "classes": [
+        "FIST",
+        "INDEX",
+        "OPEN_PALM",
+        "PINCH",
+        "SWIPE_LEFT",
+        "SWIPE_RIGHT",
+        "THREE_FINGERS",
+        "THUMBS_UP"
+    ],
+    "overall_accuracy_pct": 100.0,
+    "precision_weighted": 1.0,
+    "recall_weighted": 1.0,
+    "f1_score_weighted": 1.0,
+    "precision_macro": 1.0,
+    "recall_macro": 1.0,
+    "f1_score_macro": 1.0,
+    "confusion_matrix": [
+        [
+            20,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+        ],
+        [
+            0,
+            20,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+        ],
+        [
+            0,
+            0,
+            20,
+            0,
+            0,
+            0,
+            0,
+            0
+        ],
+        [
+            0,
+            0,
+            0,
+            20,
+            0,
+            0,
+            0,
+            0
+        ],
+        [
+            0,
+            0,
+            0,
+            0,
+            20,
+            0,
+            0,
+            0
+        ],
+        [
+            0,
+            0,
+            0,
+            0,
+            0,
+            20,
+            0,
+            0
+        ],
+        [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            20,
+            0
+        ],
+        [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            20
+        ]
+    ]
+}

@@ -94,21 +94,71 @@ class DashboardApp:
         )
         sub_lbl.pack(side=tk.LEFT, padx=(0, 0))
 
+        # Calibration & Evaluation Action Buttons
+        eval_btn = tk.Button(
+            header_frame,
+            text="🧪 Benchmark",
+            command=self._open_evaluation,
+            bg="#333345",
+            fg=self.accent_green,
+            font=("Segoe UI", 9, "bold"),
+            bd=0,
+            padx=10,
+            pady=6,
+            cursor="hand2",
+            activebackground=self.accent_green,
+            activeforeground="#000000"
+        )
+        eval_btn.pack(side=tk.RIGHT, padx=(6, 0))
+
+        cal_btn = tk.Button(
+            header_frame,
+            text="🧭 Calibrate",
+            command=self._open_calibration,
+            bg="#333345",
+            fg=self.accent_teal,
+            font=("Segoe UI", 9, "bold"),
+            bd=0,
+            padx=10,
+            pady=6,
+            cursor="hand2",
+            activebackground=self.accent_teal,
+            activeforeground="#FFFFFF"
+        )
+        cal_btn.pack(side=tk.RIGHT, padx=(6, 0))
+
         settings_btn = tk.Button(
             header_frame,
             text="⚙ Settings",
             command=self._open_settings,
             bg="#333345",
             fg=self.text_primary,
-            font=("Segoe UI", 10, "bold"),
+            font=("Segoe UI", 9, "bold"),
             bd=0,
-            padx=14,
+            padx=10,
             pady=6,
             cursor="hand2",
             activebackground=self.accent_teal,
             activeforeground="#FFFFFF"
         )
-        settings_btn.pack(side=tk.RIGHT)
+        settings_btn.pack(side=tk.RIGHT, padx=(6, 0))
+
+        # Active Profile Quick Selector
+        prof_frame = tk.Frame(header_frame, bg=self.card_bg)
+        prof_frame.pack(side=tk.RIGHT, padx=6)
+
+        prof_lbl = tk.Label(prof_frame, text="Profile:", font=("Segoe UI", 9, "bold"), bg=self.card_bg, fg=self.accent_teal)
+        prof_lbl.pack(side=tk.LEFT, padx=(0, 4))
+
+        self.profile_var_gui = tk.StringVar(value=self.settings.get("active_profile", "Desktop"))
+        profile_menu = ttk.OptionMenu(
+            prof_frame,
+            self.profile_var_gui,
+            self.profile_var_gui.get(),
+            "Desktop", "Media", "Presentation", "Custom",
+            command=self._on_quick_profile_change
+        )
+        profile_menu.pack(side=tk.LEFT)
 
         # Main Layout Container (Left Video/Status, Right Reference/Log)
         main_body = tk.Frame(self.root, bg=self.bg_dark, padx=15, pady=15)
@@ -141,15 +191,19 @@ class DashboardApp:
         self.card_ctrl = self._create_status_card(status_bar, "Gesture Control", "PAUSED", self.accent_red)
         self.card_ctrl.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=4)
 
-        # Status Pill 3: Current Gesture
+        # Status Pill 3: Active Profile
+        self.card_prof = self._create_status_card(status_bar, "Active Profile", "Desktop", self.accent_teal)
+        self.card_prof.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=4)
+
+        # Status Pill 4: Current Gesture
         self.card_gest = self._create_status_card(status_bar, "Current Gesture", "🖐️ Ready", self.accent_teal)
         self.card_gest.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=4)
 
-        # Status Pill 4: Current Action
+        # Status Pill 5: Current Action
         self.card_act = self._create_status_card(status_bar, "Current Action", "Waiting...", self.text_primary)
         self.card_act.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=4)
 
-        # Status Pill 5: Confidence & FPS
+        # Status Pill 6: Confidence & FPS
         self.card_fps = self._create_status_card(status_bar, "Conf / FPS", "-- | --", self.text_secondary)
         self.card_fps.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(4, 0))
 
@@ -293,6 +347,24 @@ class DashboardApp:
         """User emergency stop click or ESC key."""
         self.controller.emergency_stop()
 
+    def _on_quick_profile_change(self, selected_profile: str):
+        """Handler when user selects profile from dropdown menu."""
+        self.settings["active_profile"] = selected_profile
+        from config import save_settings
+        save_settings(self.settings)
+        self.controller.update_settings(self.settings)
+        log_ui(f"Active Profile changed to: {selected_profile}", "CONFIG")
+
+    def _open_calibration(self):
+        """Opens first-run calibration wizard modal."""
+        from ui.calibration_ui import CalibrationWindow
+        CalibrationWindow(self.root, self.controller)
+
+    def _open_evaluation(self):
+        """Opens safe evaluation benchmark modal."""
+        from ui.evaluation_ui import EvaluationWindow
+        EvaluationWindow(self.root, self.controller)
+
     def _open_settings(self):
         """Opens modal settings window."""
         SettingsWindow(self.root, self.settings, self._on_settings_saved)
@@ -300,6 +372,7 @@ class DashboardApp:
     def _on_settings_saved(self, new_settings: dict):
         """Callback when user saves settings in settings modal."""
         self.settings = new_settings
+        self.profile_var_gui.set(new_settings.get("active_profile", "Desktop"))
         self.controller.update_settings(new_settings)
         log_ui("Settings updated and reloaded", "CONFIG")
 
@@ -329,6 +402,10 @@ class DashboardApp:
             self.card_ctrl.val_label.config(text="PAUSED", fg=self.accent_red)
             self.btn_enable.config(bg=self.accent_green, fg="#000000")
             self.btn_disable.config(bg="#333345", fg=self.text_secondary)
+
+        # Update Active Profile Pill
+        active_prof = status.get("active_profile", "Desktop")
+        self.card_prof.val_label.config(text=active_prof, fg=self.accent_teal)
 
         # Update Current Gesture & Action Pills
         gest_label = status["gesture_label"]

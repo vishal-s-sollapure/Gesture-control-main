@@ -135,7 +135,78 @@ class SettingsWindow(tk.Toplevel):
             resolution=0.05
         )
 
-        # SECTION 2: Debug Mode & Diagnostics Card
+        # SECTION 2: Active Profile Card
+        profile_card = tk.LabelFrame(
+            scroll_frame,
+            text=" Application Control Profile ",
+            font=("Segoe UI", 11, "bold"),
+            bg=self.card_bg,
+            fg=self.accent_color,
+            bd=1,
+            relief="solid",
+            padx=15,
+            pady=10
+        )
+        profile_card.pack(fill=tk.X, pady=(0, 15))
+
+        self.profile_var = tk.StringVar(value=self.settings.get("active_profile", "Desktop"))
+
+        profiles_desc = [
+            ("Desktop", "🖥️ Desktop Profile (Default Mouse, Click, Drag, Scroll)"),
+            ("Media", "🎵 Media Profile (Thumbs Up -> Play/Pause, Swipes -> Next/Prev)"),
+            ("Presentation", "📊 Presentation Profile (Palm -> Next Slide, 3 Fingers -> Prev Slide)")
+        ]
+
+        for val, label_text in profiles_desc:
+            rbtn = tk.Radiobutton(
+                profile_card,
+                text=label_text,
+                value=val,
+                variable=self.profile_var,
+                bg=self.card_bg,
+                fg=self.text_color,
+                selectcolor="#393E46",
+                activebackground=self.card_bg,
+                activeforeground=self.accent_color,
+                font=("Segoe UI", 10)
+            )
+            rbtn.pack(anchor="w", pady=3)
+
+        # SECTION 3: Dual Recognition Engine Card
+        engine_card = tk.LabelFrame(
+            scroll_frame,
+            text=" Recognition Engine Architecture ",
+            font=("Segoe UI", 11, "bold"),
+            bg=self.card_bg,
+            fg=self.accent_color,
+            bd=1,
+            relief="solid",
+            padx=15,
+            pady=10
+        )
+        engine_card.pack(fill=tk.X, pady=(0, 15))
+
+        self.engine_var = tk.StringVar(value=self.settings.get("recognition_engine", "Rule-Based"))
+        engines = [
+            ("Rule-Based", "📐 Rule-Based Geometric Engine (3D Joint Angle & Distance Heuristics)"),
+            ("ML-Based", "🤖 ML-Based Random Forest Engine (63-D Normalized Feature Vector)")
+        ]
+        for val, label_text in engines:
+            rbtn = tk.Radiobutton(
+                engine_card,
+                text=label_text,
+                value=val,
+                variable=self.engine_var,
+                bg=self.card_bg,
+                fg=self.text_color,
+                selectcolor="#393E46",
+                activebackground=self.card_bg,
+                activeforeground=self.accent_color,
+                font=("Segoe UI", 10)
+            )
+            rbtn.pack(anchor="w", pady=3)
+
+        # SECTION 3: Debug Mode & Diagnostics Card
         debug_card = tk.LabelFrame(
             scroll_frame,
             text=" Developer Diagnostics ",
@@ -274,6 +345,8 @@ class SettingsWindow(tk.Toplevel):
         self.settings["pinch_threshold"] = round(self.pinch_var.get(), 3)
         self.settings["scroll_sensitivity"] = round(self.scroll_var.get(), 1)
         self.settings["gesture_cooldown"] = round(self.cooldown_var.get(), 2)
+        self.settings["active_profile"] = self.profile_var.get()
+        self.settings["recognition_engine"] = self.engine_var.get()
         self.settings["debug_mode"] = self.debug_var.get()
 
         enabled_dict = {key: var.get() for key, var in self.gesture_vars.items()}
@@ -295,6 +368,7 @@ class SettingsWindow(tk.Toplevel):
             self.pinch_var.set(defaults["pinch_threshold"])
             self.scroll_var.set(defaults["scroll_sensitivity"])
             self.cooldown_var.set(defaults["gesture_cooldown"])
+            self.profile_var.set(defaults.get("active_profile", "Desktop"))
             self.debug_var.set(defaults.get("debug_mode", False))
 
             for key, var in self.gesture_vars.items():

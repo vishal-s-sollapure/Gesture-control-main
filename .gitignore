@@ -7,8 +7,19 @@ env/
 ENV/
 .env
 
-# Local settings
+# Local settings & Evaluation Outputs
 settings.json
+evaluation_results.json
+
+# PyInstaller Build Artifacts
+build/
+dist/
+*.spec
+
+# ML Datasets & Trained Models
+ml/data/*.csv
+ml/*.pkl
+!ml/data/.gitkeep
 
 # IDE & OS files
 .vscode/

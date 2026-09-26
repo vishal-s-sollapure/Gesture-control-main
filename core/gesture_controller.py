@@ -12,8 +12,12 @@ import numpy as np
 
 from config import GESTURE_NAMES
 from core.camera import Camera
-from core.gesture_recognizer import GestureRecognizer
-from core.hand_tracker import HandTracker, INDEX_FINGER_TIP, WRIST
+from core.calibration import CalibrationManager
+from core.evaluation import EvaluationEngine
+from core.gesture_recognizer import GestureRecognizer, distance_3d
+from core.hand_tracker import HandTracker, INDEX_FINGER_TIP, WRIST, THUMB_TIP
+from core.metrics import MetricsCollector
+from core.profiles import ProfileManager
 from controls.keyboard_controller import KeyboardController
 from controls.media_controller import MediaController
 from controls.mouse_controller import MouseController
@@ -63,6 +67,12 @@ class GestureController:
         )
         self.recognizer = GestureRecognizer(settings)
 
+        # Performance Metrics, Calibration, Evaluation, and Profiles Engines
+        self.metrics = MetricsCollector()
+        self.calibration = CalibrationManager()
+        self.evaluation = EvaluationEngine()
+        self.profile_mgr = ProfileManager(active_profile=settings.get("active_profile", "Desktop"))
+
         # Controllers
         self.mouse = MouseController(dry_run=self.dry_run)
         self.keyboard = KeyboardController(dry_run=self.dry_run)
@@ -89,9 +99,12 @@ class GestureController:
         self.processed_frame: Optional[np.ndarray] = None
         self.frame_lock = threading.Lock()
 
+        self.active_profile = settings.get("active_profile", "Desktop")
+
     def update_settings(self, new_settings: dict):
         """Dynamic configuration update handler."""
         self.settings = new_settings
+        self.active_profile = new_settings.get("active_profile", "Desktop")
         self.control_enabled = new_settings.get("control_enabled", self.control_enabled)
         self.recognizer.update_settings(new_settings)
         self.smoother.set_factor(new_settings.get("smoothing", 0.75))
@@ -135,6 +148,7 @@ class GestureController:
         screen_w, screen_h = self.mouse.get_screen_size()
 
         while self.running:
+            t_start = time.time()
             is_connected, frame = self.camera.get_frame()
             if not is_connected or frame is None:
                 time.sleep(0.01)
@@ -143,10 +157,11 @@ class GestureController:
             # Run MediaPipe hand tracking
             tracking = self.hand_tracker.process_frame(frame)
             self.hand_count = tracking.get("hand_count", 0)
+            hand_detected = tracking.get("detected", False) and len(tracking.get("landmarks", [])) > 0
 
             annotated_frame = frame.copy()
 
-            if tracking.get("detected", False) and tracking.get("landmarks"):
+            if hand_detected:
                 landmarks = tracking["landmarks"][0]
 
                 # Draw 21 landmark skeleton joints
@@ -163,16 +178,28 @@ class GestureController:
                 self.cooldown_remaining = cooldown_rem
                 self.latest_debug_info = debug_info
 
-                # Dispatch system control actions IF CONTROL ACTIVE
-                self._dispatch_action(
-                    action_gesture=action_gesture,
-                    trigger=trigger,
-                    landmarks=landmarks,
-                    screen_w=screen_w,
-                    screen_h=screen_h,
-                    frame_w=frame.shape[1],
-                    frame_h=frame.shape[0]
-                )
+                # CALIBRATION MODE SAFETY OVERRIDE: process bounds, bypass real mouse control
+                if self.calibration.is_active:
+                    pinch_dist = distance_3d(landmarks[4], landmarks[8]) if len(landmarks) > 8 else 0.05
+                    self.calibration.process_frame_landmarks(landmarks, pinch_dist)
+                # EVALUATION MODE SAFETY OVERRIDE: record trial match, bypass real mouse control
+                elif self.evaluation.is_active:
+                    if trigger and action_gesture != "IDLE":
+                        self.evaluation.record_trial(action_gesture, confidence)
+                else:
+                    # Record recognition metric
+                    self.metrics.record_gesture(action_gesture, confirmed=trigger, confidence=confidence)
+
+                    # Dispatch system control actions IF CONTROL ACTIVE
+                    self._dispatch_action(
+                        action_gesture=action_gesture,
+                        trigger=trigger,
+                        landmarks=landmarks,
+                        screen_w=screen_w,
+                        screen_h=screen_h,
+                        frame_w=frame.shape[1],
+                        frame_h=frame.shape[0]
+                    )
             else:
                 # No hand detected
                 self.raw_gesture = "IDLE"
@@ -185,6 +212,9 @@ class GestureController:
                 self.prev_scroll_y = None
                 if self.mouse.is_dragging:
                     self.mouse.stop_drag()
+
+            proc_time_ms = (time.time() - t_start) * 1000.0
+            self.metrics.record_frame(hand_detected, proc_time_ms)
 
             # Annotate HUD overlay on frame
             annotated_frame = self._draw_hud(annotated_frame)
@@ -278,7 +308,20 @@ class GestureController:
         elif action_gesture == "RIGHT_CLICK" and trigger:
             self.mouse.right_click()
 
-        # 7. SCROLL (OPEN PALM)
+        # 7. PRESENTATION PROFILE SPECIAL ACTIONS
+        if self.active_profile == "Presentation":
+            if action_gesture == "OPEN_PALM" and trigger:
+                # Presentation Profile: Open Palm -> Next Slide (Right Arrow key)
+                self.keyboard.press_key("right")
+                log_ui("Next Slide (Open Palm)", "PRESENTATION")
+                return "Next Slide"
+            elif action_gesture == "THREE_FINGERS" and trigger:
+                # Presentation Profile: Three Fingers -> Previous Slide (Left Arrow key)
+                self.keyboard.press_key("left")
+                log_ui("Previous Slide (Three Fingers)", "PRESENTATION")
+                return "Previous Slide"
+
+        # 8. SCROLL (OPEN PALM in Desktop & Media Profiles)
         elif action_gesture == "OPEN_PALM":
             wrist_y = landmarks[WRIST]["y"]
             if self.prev_scroll_y is not None:
@@ -293,7 +336,7 @@ class GestureController:
         if action_gesture != "OPEN_PALM":
             self.prev_scroll_y = None
 
-        # 8. MEDIA CONTROLS
+        # 9. MEDIA CONTROLS
         if trigger:
             if action_gesture == "THUMBS_UP":
                 self.media.play_pause()
@@ -387,10 +430,16 @@ class GestureController:
         action_name = GESTURE_ACTION_NAMES.get(g_name, "Waiting for hand...")
         if not self.control_enabled and g_name == "FIST":
             action_name = "Gesture control disabled"
+        elif self.active_profile == "Presentation":
+            if g_name == "OPEN_PALM":
+                action_name = "Next Slide"
+            elif g_name == "THREE_FINGERS":
+                action_name = "Previous Slide"
 
         return {
             "connected": self.camera.is_connected,
             "control_enabled": self.control_enabled,
+            "active_profile": self.active_profile,
             "current_gesture": g_name,
             "gesture_label": GESTURE_NAMES.get(g_name, g_name),
             "action_name": action_name,
@@ -399,7 +448,13 @@ class GestureController:
             "hand_count": self.hand_count,
             "hand_status": "Hand Detected" if self.hand_count > 0 else "No hand detected",
             "fps": self.camera.get_fps(),
-            "cooldown_active": self.cooldown_active
+            "cooldown_active": self.cooldown_active,
+            "session_stats": self.metrics.get_session_stats(),
+            "calibration_active": self.calibration.is_active,
+            "calibration_step": self.calibration.get_current_step(),
+            "calibration_instruction": self.calibration.get_instruction(),
+            "evaluation_active": self.evaluation.is_active,
+            "evaluation_target": self.evaluation.get_target_label()
         }
 
     def stop(self):

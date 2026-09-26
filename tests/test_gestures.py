@@ -167,6 +167,12 @@ class TestGestureRecognition(unittest.TestCase):
             g_hold, trig_hold, _, _ = self.recognizer.process_state_machine("PINCH", 0.95)
             self.assertNotEqual(g_hold, "DOUBLE_PINCH")
 
+    def test_detect_three_fingers(self):
+        """Tests three fingers gesture detection (Index, Middle, Ring up)."""
+        three_lms = create_dummy_landmarks(thumb=False, index=True, middle=True, ring=True, pinky=False)
+        gesture, conf, dbg = self.recognizer.detect_gesture(three_lms)
+        self.assertEqual(gesture, "THREE_FINGERS")
+
     def test_pinch_separated_by_interval_is_two_single_clicks(self):
         """Pinch separated by more than double-click interval (0.4s) results in independent single clicks."""
         for _ in range(3):
@@ -238,6 +244,35 @@ class TestSafetyAndController(unittest.TestCase):
             frame_h=480
         )
         self.assertFalse(self.controller.control_enabled)
+
+    def test_presentation_profile_navigation(self):
+        """Tests Presentation Profile gesture actions (Open Palm -> Next Slide, Three Fingers -> Previous Slide)."""
+        self.controller.enable_control()
+        self.controller.active_profile = "Presentation"
+
+        # Dispatch OPEN_PALM in Presentation Profile
+        action = self.controller._dispatch_action(
+            action_gesture="OPEN_PALM",
+            trigger=True,
+            landmarks=[],
+            screen_w=1920,
+            screen_h=1080,
+            frame_w=640,
+            frame_h=480
+        )
+        self.assertIn("Next Slide", action)
+
+        # Dispatch THREE_FINGERS in Presentation Profile
+        action_prev = self.controller._dispatch_action(
+            action_gesture="THREE_FINGERS",
+            trigger=True,
+            landmarks=[],
+            screen_w=1920,
+            screen_h=1080,
+            frame_w=640,
+            frame_h=480
+        )
+        self.assertIn("Previous Slide", action_prev)
 
 
 if __name__ == "__main__":

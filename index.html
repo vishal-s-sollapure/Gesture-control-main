@@ -1,13 +1,17 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>GestureControl AI — Touchless Computer Control</title>
-  <meta name="description" content="Touchless Desktop Computer Control using Computer Vision & AI Hand Tracking. Control your computer with hand gestures captured through webcam.">
+  <meta name="description"
+    content="Touchless Desktop Computer Control using Computer Vision & AI Hand Tracking. Control your computer with hand gestures captured through webcam.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+  <link
+    href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap"
+    rel="stylesheet">
   <style>
     :root {
       --bg-dark: #0F0F17;
@@ -203,7 +207,8 @@
       border: 1px solid var(--card-border);
     }
 
-    .gesture-table th, .gesture-table td {
+    .gesture-table th,
+    .gesture-table td {
       padding: 1.2rem 1.5rem;
       text-align: left;
     }
@@ -241,6 +246,7 @@
     }
   </style>
 </head>
+
 <body>
 
   <header>
@@ -256,9 +262,11 @@
   <section class="hero">
     <div class="badge">100% Offline & Local Computer Vision</div>
     <h1>Touchless Desktop Control using AI Hand Tracking</h1>
-    <p>Control your laptop or desktop computer seamlessly using real-time webcam hand gestures. Built with Python, OpenCV, MediaPipe, PyAutoGUI, and NumPy.</p>
+    <p>Control your laptop or desktop computer seamlessly using real-time webcam hand gestures. Built with Python,
+      OpenCV, MediaPipe, PyAutoGUI, and NumPy.</p>
     <div class="btn-group">
-      <a href="https://github.com/vishal-s-sollapure/Gesture-control-main" target="_blank" class="btn btn-primary">View on GitHub 🚀</a>
+      <a href="https://github.com/vishal-s-sollapure/Gesture-control-main" target="_blank" class="btn btn-primary">View
+        on GitHub 🚀</a>
       <a href="#setup" class="btn btn-secondary">Local Installation Guide</a>
     </div>
   </section>
@@ -267,19 +275,22 @@
     <div class="card">
       <div class="card-icon">🎯</div>
       <h3>Real-Time 3D Landmark Tracking</h3>
-      <p>Uses MediaPipe 21 3D hand landmarks with scale-invariant distance metrics for accurate gesture recognition at any distance.</p>
+      <p>Uses MediaPipe 21 3D hand landmarks with scale-invariant distance metrics for accurate gesture recognition at
+        any distance.</p>
     </div>
 
     <div class="card">
       <div class="card-icon">🌊</div>
       <h3>Exponential Motion Smoothing</h3>
-      <p>Applies EMA smoothing and dead-zone filtering to eliminate cursor shaking and ensure fluid mouse positioning.</p>
+      <p>Applies EMA smoothing and dead-zone filtering to eliminate cursor shaking and ensure fluid mouse positioning.
+      </p>
     </div>
 
     <div class="card">
       <div class="card-icon">🛡️</div>
       <h3>Safety First Architecture</h3>
-      <p>Launches in PAUSED state by default. Includes ESC hotkey emergency stop, closed fist pause gesture, and automatic drag release.</p>
+      <p>Launches in PAUSED state by default. Includes ESC hotkey emergency stop, closed fist pause gesture, and
+        automatic drag release.</p>
     </div>
 
     <div class="card">
@@ -370,15 +381,15 @@
     <p style="color: var(--text-muted);">Clone the repository and run locally on your laptop with webcam access:</p>
 
     <div class="code-block">
-# 1. Clone repository<br>
-git clone https://github.com/vishal-s-sollapure/Gesture-control-main.git<br>
-cd Gesture-control-main<br><br>
-# 2. Setup virtual environment & dependencies<br>
-python -m venv venv<br>
-venv\Scripts\activate  # On Windows<br>
-pip install --no-build-isolation -r requirements.txt<br><br>
-# 3. Launch GestureControl AI<br>
-python main.py
+      # 1. Clone repository<br>
+      git clone https://github.com/vishal-s-sollapure/Gesture-control-main.git<br>
+      cd Gesture-control-main<br><br>
+      # 2. Setup virtual environment & dependencies<br>
+      python -m venv venv<br>
+      venv\Scripts\activate # On Windows<br>
+      pip install --no-build-isolation -r requirements.txt<br><br>
+      # 3. Launch GestureControl AI<br>
+      python main.py
     </div>
   </section>
 
@@ -387,4 +398,5 @@ python main.py
   </footer>
 
 </body>
+
 </html>

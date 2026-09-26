@@ -114,6 +114,12 @@ class GestureRecognizer:
         if not landmarks or len(landmarks) < 21:
             return "IDLE", 0.0, {}
 
+        # Check if ML-Based recognition engine is enabled
+        if self.settings.get("recognition_engine") == "ML-Based":
+            ml_result = self._detect_ml_gesture(landmarks)
+            if ml_result is not None:
+                return ml_result
+
         wrist = landmarks[WRIST]
         middle_mcp = landmarks[MIDDLE_FINGER_MCP]
 
@@ -208,7 +214,20 @@ class GestureRecognizer:
             debug_data = self._make_debug(landmarks, fingers, pinch_ratio, hand_scale, "OPEN_PALM", conf)
             return "OPEN_PALM", conf, debug_data
 
-        # PRIORITY 6: TWO FINGERS (Right Click)
+        # PRIORITY 6: THREE FINGERS (Presentation Profile: Previous Slide)
+        three_fingers = (
+            fingers["index"] and
+            fingers["middle"] and
+            fingers["ring"] and
+            not fingers["pinky"] and
+            pinch_ratio > pinch_thresh_ratio * 1.3
+        )
+        if three_fingers:
+            conf = 0.93
+            debug_data = self._make_debug(landmarks, fingers, pinch_ratio, hand_scale, "THREE_FINGERS", conf)
+            return "THREE_FINGERS", conf, debug_data
+
+        # PRIORITY 7: TWO FINGERS (Right Click)
         two_fingers = (
             fingers["index"] and
             fingers["middle"] and
@@ -221,7 +240,7 @@ class GestureRecognizer:
             debug_data = self._make_debug(landmarks, fingers, pinch_ratio, hand_scale, "RIGHT_CLICK", conf)
             return "RIGHT_CLICK", conf, debug_data
 
-        # PRIORITY 7: INDEX POINTING (Cursor Movement)
+        # PRIORITY 8: INDEX POINTING (Cursor Movement)
         if pointing_index and enabled.get("cursor_movement", True):
             index_dist = distance_3d(landmarks[INDEX_FINGER_TIP], wrist)
             middle_dist = distance_3d(landmarks[MIDDLE_FINGER_TIP], wrist)
@@ -320,11 +339,11 @@ class GestureRecognizer:
                     return "PINCH", True, True, cooldown
             return "PINCH", False, False, 0.0
 
-        # Discrete actions (RIGHT_CLICK, THUMBS_UP, SWIPE_LEFT, SWIPE_RIGHT, FIST)
+        # Discrete actions (RIGHT_CLICK, THUMBS_UP, SWIPE_LEFT, SWIPE_RIGHT, FIST, THREE_FINGERS)
         if cooldown_active:
             return confirmed_gesture, False, True, round(cooldown_remaining, 2)
 
-        if confirmed_gesture in ["RIGHT_CLICK", "THUMBS_UP", "SWIPE_LEFT", "SWIPE_RIGHT", "FIST"]:
+        if confirmed_gesture in ["RIGHT_CLICK", "THUMBS_UP", "SWIPE_LEFT", "SWIPE_RIGHT", "FIST", "THREE_FINGERS"]:
             self.last_action_time = now
             return confirmed_gesture, True, True, cooldown
 
@@ -348,3 +367,42 @@ class GestureRecognizer:
             "raw_gesture": raw_gesture,
             "confidence": round(confidence, 2)
         }
+
+    def _detect_ml_gesture(self, landmarks: list) -> Optional[Tuple[str, float, dict]]:
+        """
+        Runs ML Random Forest model inference on normalized 63-dimensional landmark feature vector.
+        """
+        try:
+            import pickle
+            from pathlib import Path
+            from ml.preprocess import normalize_landmarks
+
+            model_path = Path(__file__).resolve().parent.parent / "ml" / "model.pkl"
+            if not model_path.exists():
+                return None
+
+            if not hasattr(self, "_ml_model") or self._ml_model is None:
+                with open(model_path, "rb") as f:
+                    self._ml_model = pickle.load(f)
+
+            feats = normalize_landmarks(landmarks)
+            pred_class = self._ml_model.predict([feats])[0]
+            probs = self._ml_model.predict_proba([feats])[0]
+            conf = float(max(probs))
+
+            # Map ML class name to system gesture
+            gesture_map = {
+                "INDEX": "CURSOR",
+                "PINCH": "PINCH",
+                "THREE_FINGERS": "THREE_FINGERS",
+                "OPEN_PALM": "OPEN_PALM",
+                "FIST": "FIST",
+                "THUMBS_UP": "THUMBS_UP",
+                "SWIPE_LEFT": "SWIPE_LEFT",
+                "SWIPE_RIGHT": "SWIPE_RIGHT"
+            }
+            system_gesture = gesture_map.get(pred_class, "CURSOR")
+            debug = {"engine": "ML-Based", "raw_gesture": system_gesture, "confidence": round(conf, 2)}
+            return system_gesture, round(conf, 2), debug
+        except Exception:
+            return None

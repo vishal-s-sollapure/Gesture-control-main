@@ -9,11 +9,12 @@ from pathlib import Path
 
 # Application Metadata
 APP_NAME = "GestureControl AI"
-APP_VERSION = "1.0.0"
+APP_VERSION = "2.0.0"
 
 # Default File Paths
 BASE_DIR = Path(__file__).resolve().parent
 SETTINGS_FILE = BASE_DIR / "settings.json"
+EVALUATION_FILE = BASE_DIR / "evaluation_results.json"
 
 # Default Settings Schema
 DEFAULT_SETTINGS = {
@@ -31,6 +32,12 @@ DEFAULT_SETTINGS = {
     "margin_y": 0.15,
     "dead_zone": 3.0,           # Pixel movement threshold to ignore jitter
 
+    # Calibration parameters
+    "calibrated": False,
+    "calibrated_margin_x": 0.15,
+    "calibrated_margin_y": 0.15,
+    "calibrated_pinch_thresh": 0.045,
+
     # Gesture Thresholds
     "pinch_threshold": 0.045,   # Distance between thumb and index tip (normalized)
     "double_click_interval": 0.4, # Seconds between two pinches for double click
@@ -40,7 +47,9 @@ DEFAULT_SETTINGS = {
     "swipe_frames": 6,          # Frame history buffer for swipe detection
     "gesture_cooldown": 0.50,   # Seconds to wait between repeating discrete actions (0.5s default)
     "confidence_threshold": 0.7, # Minimum tracking confidence
+    "active_profile": "Desktop", # Active Profile: "Desktop", "Media", "Presentation", "Custom"
     "debug_mode": False,        # Display detailed landmark debug overlay
+    "recognition_engine": "Rule-Based", # Engine: "Rule-Based" or "ML-Based"
 
     # Enabled Gestures Toggle
     "enabled_gestures": {
@@ -57,12 +66,15 @@ DEFAULT_SETTINGS = {
     }
 }
 
+PROFILES = ["Desktop", "Media", "Presentation", "Custom"]
+
 # Gesture Names and Descriptions
 GESTURE_NAMES = {
     "CURSOR": "☝️ Cursor Movement",
     "PINCH": "🤏 Left Click",
     "RIGHT_CLICK": "✌️ Right Click",
-    "OPEN_PALM": "✋ Scroll",
+    "OPEN_PALM": "✋ Scroll / Next Slide",
+    "THREE_FINGERS": "🤟 Three Fingers (Prev Slide)",
     "DRAG": "✊🤏 Drag & Drop",
     "DOUBLE_PINCH": "🤏🤏 Double Click",
     "THUMBS_UP": "👍 Play/Pause",

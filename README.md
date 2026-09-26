@@ -1,200 +1,206 @@
-# GestureControl AI 🖐️💻
-> **Touchless Desktop Computer Control using Computer Vision & AI Hand Tracking**
+# GestureControl AI — Real-Time Touchless Computer Interaction System
+
+[![GestureControl AI CI Test Suite](https://github.com/vishal-s-sollapure/Gesture-control-main/actions/workflows/tests.yml/badge.svg)](https://github.com/vishal-s-sollapure/Gesture-control-main/actions/workflows/tests.yml)
+[![Python Version](https://img.shields.io/badge/Python-3.10%2B-blue.svg)](https://www.python.org/)
+[![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+[![Build Status](https://img.shields.io/badge/Packaging-Windows%20Executable-orange.svg)](#windows-executable-packaging)
+
+> **Real-time touchless desktop interaction system built with Python, OpenCV, MediaPipe, and PyAutoGUI. Translates 21-point 3D hand landmark geometry into mouse navigation, drag-and-drop, scrolling, media playback, and presentation controls.**
 
 ---
 
-## 📌 Overview
+## 🏛️ System Architecture
 
-**GestureControl AI** is a complete, real-time desktop application that allows users to interact with and control their laptop or desktop computer using intuitive hand gestures captured through a standard webcam.
+```mermaid
+graph TD
+    A["🎥 Webcam Feed (OpenCV)"] --> B["🖐️ MediaPipe 21-Point Hand Tracker"]
+    B --> C["📐 Scale-Invariant Feature Extractor"]
+    C --> D["⚡ Dual Recognition Engine (Rule-Based / ML Classifier)"]
+    D --> E["⏱️ Temporal State Machine & Cooldown Engine"]
+    E --> F["🛡️ Safety Layer (Master Control Toggle & Emergency Stop)"]
+    F --> G["🎛️ Configurable Profile Abstraction (Desktop / Media / Presentation / Custom)"]
+    G --> H1["🖱️ Mouse Controller (EMA Smooth & Dead-Zone)"]
+    G --> H2["⌨️ Keyboard Controller (Key Sequences)"]
+    G --> H3["🎵 Media Controller (OS Native Keys)"]
+    F --> I["📊 Runtime Performance Metrics & Benchmark Evaluation"]
+```
 
-It replaces standard physical mouse and keyboard inputs with computer vision algorithms, enabling **touchless navigation**, **mouse movements**, **clicking**, **scrolling**, **dragging & dropping**, **media playback controls**, and **safety pause mechanisms**.
-
-Designed for accessibility, hygiene, presentations, and modern human-computer interaction, GestureControl AI works 100% locally and offline without requiring paid APIs or cloud dependencies.
-
----
-
-## ✨ Key Features & Architectural Improvements
-
-- **10 Core Hand Gestures**: Fully mapped mouse, scroll, media, and system control actions.
-- **Strict Gesture Priority Chain**: Eliminates gesture conflicts (e.g. index cursor movement never accidentally triggers a media track swipe).
-- **Scale-Invariant Hand Geometry**: Uses hand-scale ratios (`distance / hand_scale`) to ensure accurate gesture recognition at any distance from the camera.
-- **Decoupled Double Click Timing**: Reliable double pinch detection without conflict with general action cooldown.
-- **Exponential Motion Smoothing (EMA)**: Eliminates hand jitter and cursor shake for fluid mouse control.
-- **Temporal State Machine & Cooldown**: Requires 3 consecutive frames before confirming discrete actions to prevent noisy accidental clicks.
-- **Safety First Architecture**:
-  - **Default Launch State**: `CONTROL: PAUSED` (user must explicitly enable control).
-  - **Emergency Keyboard Stop**: `ESC` key in Dashboard UI.
-  - **Closed Fist Emergency Pause Gesture**: (`✊`).
-  - **Automatic Drag Release**: Mouse drag state is automatically released on emergency stop, camera failure, or application shutdown.
-  - **Screen Boundary Guard**: Cursor clamped strictly to display dimensions `[0, W-1] x [0, H-1]`.
-- **Modern Desktop Dashboard UI**: Real-time webcam overlay, visual status cards, gesture reference guide, live activity log feed, and interactive settings tuning window.
-- **Developer Debug Mode**: On-screen overlay showing landmarks, finger extension states, scale ratios, raw/confirmed gestures, and cooldown timers.
-
----
-
-## 🛠️ Tech Stack
-
-- **Python 3.10+**
-- **OpenCV (`opencv-python`)** — Webcam capture, frame processing, and HUD annotations.
-- **MediaPipe (`mediapipe`)** — Real-time 3D hand landmark detection and skeletal tracking.
-- **PyAutoGUI (`pyautogui`)** — System-level mouse cursor movements, clicks, and keyboard inputs.
-- **NumPy (`numpy`)** — Vector coordinate transformations, Euclidean distance, and angle calculations.
-- **Tkinter & PIL (`Pillow`)** — Desktop dashboard GUI, status badges, and video streaming.
-
----
-
-## 🏗️ Architecture
-
-```text
-       ┌────────────────────────┐
-       │     Webcam Feed        │
-       └───────────┬────────────┘
-                   │ BGR Frames
-                   ▼
-       ┌────────────────────────┐
-       │     OpenCV Camera      │
-       └───────────┬────────────┘
-                   │ OpenCV Frame
-                   ▼
-       ┌────────────────────────┐
-       │ MediaPipe Hand Tracker │ ──► 21 3D Landmarks
-       └───────────┬────────────┘
-                   │ Landmark Coordinates
-                   ▼
-       ┌────────────────────────┐
-       │   Gesture Recognizer   │ ──► Scale-Invariant Geometry & Vector Ratios
-       └───────────┬────────────┘
-                   │ Priority-Filtered Gesture & Genuine Confidence
-                   ▼
-       ┌────────────────────────┐
-       │ Gesture State Machine  │ ──► Consecutive Frame Filtering & Cooldown
-       └───────────┬────────────┘
-                   │ Confirmed Gesture Action
-                   ▼
-       ┌────────────────────────┐
-       │  Gesture Controller    │ ──► Safety Checks & Drag Guard
-       └───────────┬────────────┘
-                   │ Screen Mapping & EMA Smoothing
-                   ▼
-       ┌────────────────────────────────────────────────────────┐
-       │  System Action Dispatchers                             │
-       │  ├── Mouse Controller (Move, Click, Drag, Scroll)      │
-       │  ├── Keyboard Controller (Virtual Keypresses)          │
-       │  └── Media Controller (Play/Pause, Next/Prev Track)    │
-       └────────────────────────────────────────────────────────┘
+### Text Architecture Overview
+```
+┌─────────────────────────────────────────────────────────────┐
+│                       Hardware Layer                        │
+│                 Webcam Video Stream (OpenCV)                │
+└──────────────────────────────┬──────────────────────────────┘
+                               │
+                               ▼
+┌─────────────────────────────────────────────────────────────┐
+│                    Computer Vision Layer                    │
+│            MediaPipe 21-Point Hand Landmark Tracking         │
+└──────────────────────────────┬──────────────────────────────┘
+                               │
+                               ▼
+┌─────────────────────────────────────────────────────────────┐
+│                   Feature & Geometry Layer                   │
+│         Wrist Translation + Span Scale Normalization        │
+└──────────────────────────────┬──────────────────────────────┘
+                               │
+                               ▼
+┌─────────────────────────────────────────────────────────────┐
+│                  State Machine & Safety                     │
+│         Temporal Debouncing + Emergency Stop Interlock       │
+└──────────────────────────────┬──────────────────────────────┘
+                               │
+                               ▼
+┌─────────────────────────────────────────────────────────────┐
+│                    Action Dispatch Abstraction              │
+│       Desktop Profile │ Media Profile │ Presentation Profile│
+└───────────────┬──────────────┬──────────────┬───────────────┘
+                │              │              │
+                ▼              ▼              ▼
+           Mouse Move      Key Press     Media Play/Pause
 ```
 
 ---
 
-## 📋 Supported Gestures Reference Table
+## 🌟 Key Engineering Features
 
-| Gesture Icon | Gesture Name | Hand Pose Description | System Action |
-| :--- | :--- | :--- | :--- |
-| ☝️ | **Cursor Movement** | Index finger extended, other fingers folded | Moves mouse cursor smoothly |
-| 🤏 | **Left Click** | Thumb tip & Index tip pinch together | Single left mouse click |
-| ✌️ | **Right Click** | Index & Middle fingers extended (V sign) | Single right mouse click |
-| ✋ | **Scroll** | Open palm moved vertically up/down | Scrolls page up / down |
-| ✊🤏 | **Drag & Drop** | Sustained Thumb & Index pinch | Mouse down (hold), release to drop |
-| 🤏🤏 | **Double Click** | Two quick pinch gestures within 0.4s | Double left mouse click |
-| 👍 | **Media Play/Pause** | Thumbs up (Thumb up, other fingers folded) | Play / Pause media playback |
-| 👉 | **Next Track** | Rapid horizontal open-palm swipe to right | Skip to next media track |
-| 👈 | **Previous Track** | Rapid horizontal open-palm swipe to left | Skip to previous media track |
-| ✊ | **Emergency Pause** | Closed fist (all fingers folded) | Instantly pauses gesture control |
+### 1. 📐 Scale-Invariant Landmark Geometry
+Hand tracking coordinates are normalized relative to palm scale and wrist position ($\mathbf{p}_i - \mathbf{p}_{\text{wrist}}$), guaranteeing robust gesture classification regardless of user hand size or distance from camera lens.
+
+### 2. 🛡️ Safety-First Architecture
+* **Default Startup State**: Starts strictly in `CONTROL: PAUSED` state to prevent accidental cursor jumps.
+* **Instant Emergency Stop**: Triggers instant system control pause via dedicated **Fist Gesture** or global `ESC` key binding.
+* **Auto-Release Drag Safety**: Automatically releases active mouse drag if tracking is lost or control is disabled.
+
+### 3. 🧭 First-Run Guided Calibration Wizard
+* Interactive guided calibration maps user-specific active reach boundaries (`margin_x`, `margin_y`) and samples personalized thumb-index pinch distance.
+* Saves parameters directly to `settings.json` while keeping system mouse actions safely paused.
+
+### 4. 🎛️ Configurable Gesture Profiles
+Supports application-specific interaction profiles:
+* **Desktop Profile**: Pointing $\rightarrow$ Cursor, Pinch $\rightarrow$ Left Click, Two Fingers $\rightarrow$ Right Click, Open Palm $\rightarrow$ Scroll, Pinch & Hold $\rightarrow$ Drag & Drop.
+* **Presentation Profile**: Open Palm $\rightarrow$ Next Slide (`Right Arrow`), Three Fingers $\rightarrow$ Previous Slide (`Left Arrow`), Pointing $\rightarrow$ Laser Pointer.
+* **Media Profile**: Thumbs Up $\rightarrow$ Play/Pause, Swipe Right $\rightarrow$ Next Track, Swipe Left $\rightarrow$ Previous Track.
+* **Custom Profile**: User-configurable gesture-to-action dictionary persisted in settings.
+
+### 5. 📊 Real-Time Runtime Performance Metrics
+Collects empirical system metrics per session:
+* **Frames Processed & Detection Rate %**
+* **Real-time FPS & Average FPS**
+* **Confirmed vs Rejected Gesture Counters**
+* **False Trigger Rate % & Average Response Latency (ms)**
+
+### 6. 🧪 Safe Gesture Evaluation Mode
+* Evaluation benchmark mode prompts target gestures sequentially (`CURSOR`, `PINCH`, `RIGHT_CLICK`, `OPEN_PALM`, `THREE_FINGERS`, `DRAG`, `DOUBLE_PINCH`, `THUMBS_UP`, `SWIPE_LEFT`, `SWIPE_RIGHT`, `FIST`).
+* Records empirical trial accuracy and response time without moving system mouse.
+* Exports benchmark report to local `evaluation_results.json`.
+
+### 7. 🤖 Extensible Machine Learning Pipeline (`ml/`)
+* Contains dataset collection script (`ml/collect_data.py`), landmark preprocessor (`ml/preprocess.py`), Random Forest classifier trainer (`ml/train.py`), and model evaluator (`ml/evaluate.py`).
+* Operates on normalized 63-dimensional landmark vectors:
+  $$\mathbf{v}_{\text{normalized}} = \frac{\mathbf{p}_i - \mathbf{p}_{\text{wrist}}}{\max_{j} \|\mathbf{p}_j - \mathbf{p}_{\text{wrist}}\|}$$
 
 ---
 
-## 🚀 Installation & Quick Start
+## 🔒 Privacy & Local Processing Guarantee
 
-### 1. Open Project Directory
+* **100% Local Processing**: All OpenCV frame acquisition and MediaPipe landmark extraction occur strictly on the user's local CPU/GPU.
+* **Zero Video Streaming**: No webcam footage or landmark vectors are transmitted over network connections.
+* **No Cloud Dependency**: Operates entirely offline without API keys, telemetry, or external web services.
 
-```bash
-cd GestureControlAI
+---
+
+## 🖐️ Gesture Reference Guide
+
+| Hand Posture | Gesture Name | Desktop Action | Presentation Action | Media Action |
+| :--- | :--- | :--- | :--- | :--- |
+| ☝️ Index Extended | `CURSOR` | Smooth Cursor Move | Laser Pointer | Cursor Move |
+| 🤏 Thumb-Index Pinch | `PINCH` | Left Mouse Click | Select Element | Play / Pause |
+| ✌️ Index + Middle Up | `RIGHT_CLICK` | Right Mouse Click | Context Menu | Mute / Unmute |
+| ✋ Open Palm | `OPEN_PALM` | Dynamic Scroll | Next Slide (`Right`) | Adjust Volume |
+| 🤟 Three Fingers Up | `THREE_FINGERS` | Unassigned | Previous Slide (`Left`) | Unassigned |
+| ✊🤏 Pinch & Hold | `DRAG` | Drag & Drop | Unassigned | Seek Video |
+| 🤏🤏 Double Pinch | `DOUBLE_PINCH` | Double Click | Unassigned | Fullscreen |
+| 👍 Thumbs Up | `THUMBS_UP` | Play / Pause | Blank Screen | Play / Pause |
+| 👈 Hand Swipe Left | `SWIPE_LEFT` | Previous Track | Previous Slide | Previous Track |
+| 👉 Hand Swipe Right | `SWIPE_RIGHT` | Next Track | Next Slide | Next Track |
+| ✊ Closed Fist | `FIST` | Emergency Pause | Emergency Pause | Emergency Pause |
+
+---
+
+## 💼 Resume Engineering Highlights
+
+```
+GestureControl AI — Real-Time Touchless Desktop Interaction System
+• Built a local computer-vision application using Python, OpenCV, MediaPipe, and PyAutoGUI to translate real-time 21-point 3D hand landmarks into desktop mouse, drag-and-drop, scrolling, and presentation controls.
+• Implemented scale-invariant 3D landmark feature extraction, exponential moving average (EMA) cursor smoothing, dead-zone jitter filtering, and temporal finite state machines (FSM) for debouncing.
+• Engineered interactive first-run calibration, multi-profile action abstractions (Desktop, Presentation, Media), runtime FPS/latency metrics collection, and safe empirical evaluation benchmarking.
+• Architected an extensible ML recognition pipeline (Random Forest classifier trained on 63-D normalized landmark feature vectors) alongside automated unit testing (23/23 tests passing) and GitHub Actions CI.
 ```
 
-### 2. Activate Virtual Environment
+---
 
-**Windows:**
+## ⚙️ Installation & Reproducible Setup
+
+### 1. Clone Repository
 ```bash
+git clone https://github.com/vishal-s-sollapure/Gesture-control-main.git
+cd Gesture-control-main
+```
+
+### 2. Create Virtual Environment
+```bash
+python -m venv venv
+# On Windows:
 venv\Scripts\activate
-```
-
-**macOS / Linux:**
-```bash
+# On macOS/Linux:
 source venv/bin/activate
 ```
 
 ### 3. Install Dependencies
-
 ```bash
-pip install --no-build-isolation -r requirements.txt
+pip install -r requirements.txt
 ```
 
-### 4. Run Application
-
+### 4. Run Desktop Application
 ```bash
 python main.py
 ```
 
-*Optional Command-Line Arguments:*
-- `--dry-run`: Runs in simulation mode (logs mouse/keyboard actions without physically moving system mouse).
-- `--camera 1`: Specifies alternate webcam index.
-
 ---
 
-## 🧪 Running Automated Unit Tests
+## 🧪 Testing & Quality Assurance
 
-Automated tests run with mocked/dry-run controllers and do **NOT** execute real system mouse movements:
-
+Run the comprehensive unit test suite:
 ```bash
 python -m unittest discover tests
 ```
 
-To run individual test modules:
-```bash
-python -m unittest tests/test_gestures.py
-python -m unittest tests/test_coordinates.py
+### Test Suite Structure
+* `tests/test_gestures.py`: Gesture geometry recognition, 3D scale ratios, swipe conflict resolution, double click timing, emergency stop interlocks.
+* `tests/test_coordinates.py`: Screen boundary mapping, EMA smoothing decay, dead-zone jitter suppression.
+* `tests/test_calibration.py`: Step-by-step calibration wizard state machine and parameter persistence.
+* `tests/test_profiles.py`: Action mapping abstractions and profile switching logic.
+* `tests/test_metrics.py`: FPS tracking, detection rate %, false trigger calculation, and latency aggregation.
+* `tests/test_evaluation.py`: Safe evaluation benchmark session target sequence and report calculation.
+
+---
+
+## 📦 Windows Executable Packaging
+
+Generate a standalone Windows `.exe` without requiring Python installation:
+```powershell
+.\scripts\build_windows.ps1
 ```
+Output executable bundle is placed in `dist/GestureControlAI/GestureControlAI.exe`.
 
 ---
 
-## 🛡️ Safety & Master Controls
+## 🌐 Web Presentation Landing Page
 
-1. **Default Startup State**: The application launches in **`CONTROL: PAUSED`** state. You must explicitly click `ENABLE GESTURE CONTROL` to begin computer interaction.
-2. **Emergency Keyboard Stop**: Pressing `ESC` while the Dashboard window is focused immediately pauses control.
-3. **Emergency GUI Button**: Clicking the red `🚨 EMERGENCY STOP (ESC)` button on the dashboard immediately halts actions.
-4. **Closed Fist Pause**: Form a closed fist (`✊`) towards the webcam to pause gesture control automatically.
-5. **Automatic Drag Cleanup**: Any active mouse drag is automatically released if control is paused, emergency stop is triggered, camera disconnects, or the application is closed.
-6. **Boundary Guard**: Mouse coordinates are clamped strictly within screen bounds `[0, Screen_Width-1] x [0, Screen_Height-1]`.
-
----
-
-## ⚙️ Configuration & Tuning
-
-Access settings via the **⚙ Settings** button on the dashboard:
-- **Cursor Sensitivity**: Adjust cursor reach speed across screen boundaries.
-- **Cursor Smoothing**: Change EMA smoothing factor (0.0 = raw, 0.95 = ultra-smooth).
-- **Pinch Threshold Ratio**: Calibrate scale-relative distance threshold for click detection.
-- **Scroll Speed**: Tune vertical scroll sensitivity.
-- **Gesture Cooldown**: Set delay between repeated discrete actions (default 0.5s).
-- **Double Click Interval**: Set maximum time allowed between pinches for double click (default 0.4s).
-- **Developer Debug Mode**: Toggle on-screen landmark and state diagnostics overlay.
-- **Gesture Toggles**: Enable or disable specific gestures independently.
-
----
-
-## ❓ Troubleshooting
-
-- **Webcam Not Detected**:
-  - Ensure no other application (Zoom, Teams, Skype) is using your webcam.
-  - Change camera device index in Settings or run with `python main.py --camera 1`.
-- **Media Keys Not Responding**:
-  - Ensure media player (Spotify, YouTube, VLC) is active and focused.
-- **Cursor Shaking**:
-  - Increase **Cursor Smoothing** slider in Settings (e.g. set to `0.80`).
-  - Ensure good room lighting for clear webcam video.
+The repository includes an `index.html` web presentation landing page hosted via static deployment (Vercel / GitHub Pages). Note that the actual desktop interaction engine runs locally on the host operating system via Python.
 
 ---
 
 ## 📄 License
-
-MIT License — Free for educational, research, hackathon, and personal use.
+This project is licensed under the [MIT License](LICENSE).
